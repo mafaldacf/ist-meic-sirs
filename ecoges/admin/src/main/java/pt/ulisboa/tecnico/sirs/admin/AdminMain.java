@@ -4,19 +4,22 @@ import java.io.IOException;
 import java.util.Scanner;
 
 public class AdminMain {
+	private static String serverHost = "localhost";
+	private static int serverPort = 8000;
 
+	// Usage: [<serverHost>] [<serverPort>]
 	public static void main(String[] args) {
-		String serverHost;
-		int serverPort;
+		try {
+			if (args.length == 2) {
+				serverHost = args[0];
+				serverPort = Integer.parseInt(args[1]);
+			}
 
-		if (args.length != 2) {
-			System.out.println("Could not start employee.");
-			System.out.println("Usage: <serverHost> <serverPort>");
+		} catch (NumberFormatException e) {
+			System.out.println("Invalid arguments.");
+			System.out.println("Usage: [<serverHost>] [<serverPort>]");
 			return;
 		}
-
-		serverHost = args[0];
-		serverPort = Integer.parseInt(args[1]);
 
 		System.out.println(">>> " + AdminMain.class.getSimpleName() + " <<<");
 		System.out.println("Setting up server connection on " + serverHost + ":" + serverPort);

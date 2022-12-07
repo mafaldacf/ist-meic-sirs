@@ -18,22 +18,31 @@ public class BackofficeMain {
 
 	private static Connection dbConnection = null;
 
-	private static final String dbURL = "jdbc:mysql://localhost:3306/clientdb";
 	private static final String dbUser = "root";
 	private static final String dbPassword = "admin";
 
 	private static final String dbDriver = "com.mysql.cj.jdbc.Driver";
 
+	private static String dbURL = "jdbc:mysql://localhost:3306/clientdb"; // default value
 
+	private static int serverPort = 8000;
+
+
+	// Usage: [<serverPort>] [<databaseHost>] [<databasePort>]
 	public static void main(String[] args) throws IOException {
+		try {
+			if (args.length == 3) {
+				serverPort = Integer.parseInt(args[0]);
+				String dbHost = args[1];
+				int dbPort = Integer.parseInt(args[2]);
+				dbURL = "jdbc:mysql://" + dbHost + ":" + dbPort + "/clientdb";
+			}
 
-		if (args.length != 1) {
-			System.out.println("Could not start server.");
-			System.out.println("Usage: <serverPort>");
+		} catch (NumberFormatException e) {
+			System.out.println("Invalid arguments.");
+			System.out.println("Usage: [<serverPort>] [<databaseHost>] [<databasePort>]");
 			return;
 		}
-
-		int serverPort = Integer.parseInt(args[0]);
 
 		try {
 			cert = Files.newInputStream(Paths.get("../keyscerts/backoffice.crt"));
@@ -49,6 +58,7 @@ public class BackofficeMain {
 
 		try {
 			// Database
+			System.out.println("Setting up database connection on " + dbURL);
 			Class.forName(dbDriver);
 			dbConnection = DriverManager.getConnection(dbURL, dbUser, dbPassword);
 			if (dbConnection != null) populateDatabase();
