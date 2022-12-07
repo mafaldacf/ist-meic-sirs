@@ -5,11 +5,14 @@ import io.grpc.stub.StreamObserver;
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.HelloException;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+
 public class BackofficeServiceImpl extends ServerServiceGrpc.ServerServiceImplBase {
 	private static Backoffice server;
 
-	public BackofficeServiceImpl() {
-		this.server = new Backoffice();
+	public BackofficeServiceImpl(Connection dbConnection) throws SQLException, ClassNotFoundException {
+		this.server = new Backoffice(dbConnection);
 	}
 
 	@Override

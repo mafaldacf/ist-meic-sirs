@@ -26,18 +26,21 @@ The EcoGes application concerns a five-tier system:
 
 - Java Developer Kit 19 (JDK 19)
 - Maven 3
+- MySQL ?
 
-Install maven:
+Install:
 
     sudo apt update
+    sudo apt install mysql-server
     sudo apt install maven
 
 Confirm all versions are correctly installed:
 
     javac -version
     mvn -version
+    mysql -v
 
-All machines will be running on Linux machines.
+All virtual machines will be running on Linux.
 
 ## Configure network and firewall
 

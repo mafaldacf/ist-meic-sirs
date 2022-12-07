@@ -38,11 +38,23 @@ public class Admin {
 		}
 	}
 
+	public static boolean register(String username, String password) {
+		//TODO
+		return false;
+	}
+
+	public static boolean login(String username, String password) {
+		//TODO
+		return false;
+	}
+
 	public static String listUsers() {
+		//TODO
 		return "";
 	}
 
 	public static String checkUser(int id) {
+		//TODO
 		return "";
 	}
 }

@@ -6,14 +6,71 @@ package pt.ulisboa.tecnico.sirs.webserver.grpc;
 
 option java_multiple_files = true;
 
-message HelloRequest{
-	string name = 1;
-}
-
-message HelloResponse{
-	string response = 1;
-}
-
 service ServerService {
-	rpc hello(HelloRequest) returns (HelloResponse);
+	rpc register(RegisterRequest) returns (AckResponse);
+	rpc login(LoginRequest) returns (AckResponse);
+	rpc checkPersonalInfo(CheckPersonalInfoRequest) returns (CheckPersonalInfoResponse);
+	rpc checkEnergyConsumption(CheckEnergyConsumptionRequest) returns (CheckEnergyConsumptionResponse);
+	rpc updateAddress(UpdateAddressRequest) returns (AckResponse);
+	rpc updatePlan(UpdatePlanRequest) returns (AckResponse);
+}
+
+enum PlanType {
+	FLAT_RATE = 0;
+	BI_HOURLY_RATE = 1;
+}
+
+message AckResponse {
+	bool ack = 1;
+}
+
+// Register service
+message RegisterRequest {
+	string username = 1;
+	string password = 2;
+	string address = 3;
+	PlanType plan = 4;
+}
+
+// Login service
+
+message LoginRequest {
+	string username = 1;
+	string password = 2;
+}
+
+// Check personal info service
+
+message CheckPersonalInfoRequest {
+	string username = 1; // TODO should be replaced by a session cookie generated after login
+}
+
+message CheckPersonalInfoResponse {
+	string address = 1;
+	PlanType plan = 2;
+}
+
+// Check energy consumption service
+
+message CheckEnergyConsumptionRequest {
+	string username = 1; // TODO should be replaced by a session cookie generated after login
+}
+
+message CheckEnergyConsumptionResponse {
+	float energyConsumedPerMonth = 1;
+	float energyConsumedPerHour = 2;
+}
+
+// Update personal address
+
+message UpdateAddressRequest {
+	string username = 1; // TODO should be replaced by a session cookie generated after login
+	string address = 2;
+}
+
+// Update personal plan
+
+message UpdatePlanRequest {
+	string username = 1; // TODO should be replaced by a session cookie generated after login
+	PlanType plan = 2;
 }

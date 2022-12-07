@@ -23,6 +23,11 @@ openssl genrsa -out backoffice.key
 openssl pkcs8 -topk8 -nocrypt -in backoffice.key -out backoffice.pem
 openssl req -new -key backoffice.key -out backoffice.csr -subj "/C=PT/ST=Lisbon/L=Lisbon/O=IST/CN=localhost"
 
+# Generate database key and certificate signing request
+openssl genrsa -out database.key
+openssl pkcs8 -topk8 -nocrypt -in database.key -out database.pem
+openssl req -new -key database.key -out database.csr -subj "/C=PT/ST=Lisbon/L=Lisbon/O=IST/CN=localhost"
+
 # Sign webserver certificate
 
 openssl x509 -req -days 365 -in webserver.csr -CA ca.crt -CAkey ca.key -extfile webserver-domains.ext -set_serial 01 -out webserver.crt
@@ -30,6 +35,10 @@ openssl x509 -req -days 365 -in webserver.csr -CA ca.crt -CAkey ca.key -extfile 
 # Sign backoffice certificate
 
 openssl x509 -req -days 365 -in backoffice.csr -CA ca.crt -CAkey ca.key -extfile backoffice-domains.ext -set_serial 01 -out backoffice.crt
+
+# Sign database certificate
+
+openssl x509 -req -days 365 -in database.csr -CA ca.crt -CAkey ca.key -extfile database-domains.ext -set_serial 01 -out database.crt
 
 echo ""
 echo "Done."

@@ -8,6 +8,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="backoffice" />
         <module name="client" />
+        <module name="admin" />
         <module name="webserver-contract" />
         <module name="webserver" />
         <module name="backoffice-contract" />
@@ -23,6 +24,7 @@
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="admin" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="backoffice" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="client" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="employee" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />

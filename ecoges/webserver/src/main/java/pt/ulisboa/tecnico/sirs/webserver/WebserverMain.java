@@ -16,6 +16,14 @@ public class WebserverMain {
 	private static InputStream cert;
 	private static InputStream key;
 
+	private static Connection dbConnection = null;
+
+	private static final String dbURL = "jdbc:mysql://localhost:3306/clientdb";
+	private static final String dbUser = "root";
+	private static final String dbPassword = "admin";
+
+	private static final String dbDriver = "com.mysql.cj.jdbc.Driver";
+
 
 	public static void main(String[] args) throws IOException {
 
@@ -40,10 +48,17 @@ public class WebserverMain {
 		System.out.println(">>> " + WebserverMain.class.getSimpleName() + " <<<");
 
 		try {
-			impl = new WebserverServiceImpl();
+			// Database
+			Class.forName(dbDriver);
+			dbConnection = DriverManager.getConnection(dbURL, dbUser, dbPassword);
+			if (dbConnection != null) populateDatabase();
+
+			// Service
+			impl = new WebserverServiceImpl(dbConnection);
 			server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext).addService(impl).build();
 			server.start();
 			System.out.println("Listening on port " + serverPort + "...");
+
 
 			// Do not exit the main thread. Wait until server is terminated.
 			server.awaitTermination();
@@ -52,9 +67,35 @@ public class WebserverMain {
 		} catch (IOException e) {
 			System.out.println("ERROR: Could not start server.");
 		} catch (SQLException e) {
-			System.out.println(e.getMessage());
+			System.out.println("ERROR: Could not connect to database: " + e.getMessage());
 		} catch (ClassNotFoundException e) {
 			System.out.println("ERROR: Database class not found.");
+		}
+	}
+
+	private static void populateDatabase() {
+		String query;
+		Statement statement;
+
+		try {
+			query = "DROP TABLE IF EXISTS client";
+			statement = dbConnection.createStatement();
+			statement.execute(query);
+
+			query = "CREATE TABLE client (id INTEGER NOT NULL AUTO_INCREMENT, " +
+					"username VARCHAR(25) NOT NULL," +
+					"password VARCHAR(25) NOT NULL," +
+					"address VARCHAR(25) NOT NULL," +
+					"plan VARCHAR(15) DEFAULT 'FLAT_RATE'," + // plan = FLAT_RATE or BI_HOURLY_RATE
+					"energyConsumedPerMonth DECIMAL(15, 2) DEFAULT 0, " +
+					"energyConsumedPerHour DECIMAL(15, 2) DEFAULT 0," +
+					"UNIQUE (username)," +
+					"PRIMARY KEY (id))";
+			statement = dbConnection.createStatement();
+			statement.execute(query);
+			System.out.println("Successfully populated database.");
+		} catch (SQLException e) {
+			System.out.println("Could not populate database: "+ e.getMessage());
 		}
 	}
 }
