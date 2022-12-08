@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Clean previous keys and certificates
 
