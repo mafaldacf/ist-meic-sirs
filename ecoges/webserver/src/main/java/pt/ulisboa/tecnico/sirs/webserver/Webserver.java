@@ -84,14 +84,19 @@ public class Webserver {
 
         st.close();
 
-        // register email
-        query = "INSERT INTO client(email, password, address, plan) VALUES(?, ?, ?, ?)";
-        st = dbConnection.prepareStatement(query);
+        // register client
+        float energyConsumedPerMonth = (float)(Math.random()*300);
+        float energyConsumedPerHour = energyConsumedPerMonth/700;
 
+        query = "INSERT INTO client(email, password, address, plan, energyConsumedPerMonth, energyConsumedPerHour) " +
+                "VALUES(?, ?, ?, ?, ?, ?)";
+        st = dbConnection.prepareStatement(query);
         st.setString(1, email);
         st.setString(2, password);
         st.setString(3, address);
         st.setString(4, plan);
+        st.setFloat(5, energyConsumedPerMonth);
+        st.setFloat(6, energyConsumedPerHour);
 
         st.executeUpdate();
 

@@ -92,8 +92,8 @@ public class Client {
 					.setHashedToken(hashedToken)
 					.build();
 			CheckEnergyConsumptionResponse response = server.checkEnergyConsumption(request);
-			result += "Energy Consumption per Month: " + response.getEnergyConsumedPerMonth()
-					+ ", Energy Consumption per Hour: " + response.getEnergyConsumedPerHour();
+			result += "Energy Consumption per Month: " + response.getEnergyConsumedPerMonth() + " kW"
+					+ ", Energy Consumption per Hour: " + response.getEnergyConsumedPerHour() + " kW";
 		} catch (StatusRuntimeException e) {
 			System.out.println(e.getMessage());
 		}

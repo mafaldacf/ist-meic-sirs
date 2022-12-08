@@ -11,14 +11,12 @@ import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
 
 public class BackofficeMain {
-	private static Server server = null;
-	private static BackofficeServiceImpl impl = null;
 	private static InputStream cert;
 	private static InputStream key;
 
 	private static Connection dbConnection = null;
 
-	private static final String dbUser = "root";
+	private static final String dbUser = "ecoges";
 	private static final String dbPassword = "admin";
 
 	private static final String dbDriver = "com.mysql.cj.jdbc.Driver";
@@ -28,7 +26,7 @@ public class BackofficeMain {
 	private static int serverPort = 8001;
 
 
-	// Usage: [<serverPort>] [<databaseHost>] [<databasePort>]
+	// Usage: <serverPort> <databaseHost> <databasePort>
 	public static void main(String[] args) throws IOException {
 		try {
 			if (args.length == 3) {
@@ -41,7 +39,7 @@ public class BackofficeMain {
 		} catch (NumberFormatException e) {
 			System.out.println("Invalid arguments.");
 			System.out.println("Usage: [<serverPort>] [<databaseHost>] [<databasePort>]");
-			return;
+			System.exit(1);
 		}
 
 		try {
@@ -49,7 +47,7 @@ public class BackofficeMain {
 			key = Files.newInputStream(Paths.get("../keyscerts/backoffice.pem"));
 		} catch(IllegalArgumentException | UnsupportedOperationException | IOException e){
 			System.out.println("Could not load server key or certificate.");
-			return;
+			System.exit(1);
 		}
 
 		SslContext sslContext = GrpcSslContexts.forServer(cert, key).build();
@@ -64,8 +62,8 @@ public class BackofficeMain {
 			if (dbConnection != null) setupDatabase();
 
 			// Service
-			impl = new BackofficeServiceImpl(dbConnection);
-			server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext).addService(impl).build();
+			BackofficeServiceImpl impl = new BackofficeServiceImpl(dbConnection);
+			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext).addService(impl).build();
 			server.start();
 			System.out.println("Listening on port " + serverPort + "...");
 
@@ -80,6 +78,8 @@ public class BackofficeMain {
 			System.out.println("ERROR: Could not connect to database: " + e.getMessage());
 		} catch (ClassNotFoundException e) {
 			System.out.println("ERROR: Database class not found.");
+		}  finally {
+			System.exit(1);
 		}
 	}
 
@@ -100,8 +100,11 @@ public class BackofficeMain {
 					"PRIMARY KEY (id))";
 			statement = dbConnection.createStatement();
 			statement.execute(query);
+
+			System.out.println("Database is ready!");
 		} catch (SQLException e) {
-			System.out.println("Could not populate database: "+ e.getMessage());
+			System.out.println("Could not set up database: "+ e.getMessage());
+			System.exit(1);
 		}
 	}
 }

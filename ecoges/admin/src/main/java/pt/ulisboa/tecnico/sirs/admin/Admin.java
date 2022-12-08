@@ -81,8 +81,8 @@ public class Admin {
 				clients += "Username: " + client.getEmail()
 						+ ", Address: " + client.getAddress()
 						+ ", Plan: " + client.getPlanType().name()
-						+ ", Energy Consumed Per Month: " + client.getEnergyConsumedPerMonth()
-						+ ", Energy Consumed Per Hour: " + client.getEnergyConsumedPerHour()
+						+ ", Energy Consumed Per Month: " + client.getEnergyConsumedPerMonth() + " kW"
+						+ ", Energy Consumed Per Hour: " + client.getEnergyConsumedPerHour() + " kW"
 						+ "\n";
 			}
 		} catch (StatusRuntimeException e) {
