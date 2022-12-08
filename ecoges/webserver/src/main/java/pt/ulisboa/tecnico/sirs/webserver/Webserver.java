@@ -1,11 +1,11 @@
 package pt.ulisboa.tecnico.sirs.webserver;
 
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.HelloException;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.ClientDoesNotExistException;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.ClientAlreadyExistsException;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.WrongPasswordException;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.PlanType;
+import pt.ulisboa.tecnico.sirs.crypto.Crypto;
+import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
 
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SignatureException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,29 +17,78 @@ public class Webserver {
         this.dbConnection = dbConnection;
     }
 
-    public void register(String username, String password, String address, String plan) throws SQLException, ClientAlreadyExistsException {
+    public String setClientSession(String email)
+            throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, SQLException {
+
+        String query;
+        PreparedStatement st;
+
+        String token = Crypto.generateToken();
+        String hashedToken = Crypto.hash(token);
+
+        query = "UPDATE client SET token = ? WHERE email = ?";
+        st = dbConnection.prepareStatement(query);
+        st.setString(1, hashedToken);
+        st.setString(2, email);
+        st.executeUpdate();
+        st.close();
+
+        return hashedToken;
+    }
+
+    public void validateSession(String email, String hashedToken)
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
+
         String query;
         PreparedStatement st;
         ResultSet rs;
 
-        // check if username is already registered
-        query = "SELECT COUNT(*) FROM client WHERE username=?";
+        query = "SELECT COUNT(*) FROM client WHERE email = ?";
         st = dbConnection.prepareStatement(query);
-        st.setString(1, username);
+        st.setString(1, email);
+        rs = st.executeQuery();
+
+        if (rs.next() && rs.getInt(1) == 0){
+            throw new ClientDoesNotExistException(email);
+        }
+        st.close();
+
+        query = "SELECT token FROM client WHERE email = ?";
+        st = dbConnection.prepareStatement(query);
+        st.setString(1, email);
+        rs = st.executeQuery();
+
+        if (rs.next()){
+            String dbHashedToken = rs.getString(1);
+            if (!dbHashedToken.equals(hashedToken))
+                throw new InvalidSessionTokenException();
+        }
+        st.close();
+    }
+
+    public void register(String email, String password, String address, String plan) throws SQLException, ClientAlreadyExistsException {
+        String query;
+        PreparedStatement st;
+        ResultSet rs;
+
+        // check if email is already registered
+        query = "SELECT COUNT(*) FROM client WHERE email=?";
+        st = dbConnection.prepareStatement(query);
+        st.setString(1, email);
 
         rs = st.executeQuery();
 
         if (rs.next() && rs.getInt(1) != 0){
-            throw new ClientAlreadyExistsException(username);
+            throw new ClientAlreadyExistsException(email);
         }
 
         st.close();
 
-        // register username
-        query = "INSERT INTO client(username, password, address, plan) VALUES(?, ?, ?, ?)";
+        // register email
+        query = "INSERT INTO client(email, password, address, plan) VALUES(?, ?, ?, ?)";
         st = dbConnection.prepareStatement(query);
 
-        st.setString(1, username);
+        st.setString(1, email);
         st.setString(2, password);
         st.setString(3, address);
         st.setString(4, plan);
@@ -50,14 +99,17 @@ public class Webserver {
         st.close();
     }
 
-    public void login(String username, String password) throws ClientDoesNotExistException, SQLException, WrongPasswordException {
+    public String login(String email, String password)
+            throws ClientDoesNotExistException, SQLException,
+            WrongPasswordException, NoSuchAlgorithmException, SignatureException, InvalidKeyException {
+
         String query;
         PreparedStatement st;
         ResultSet rs;
 
-        query = "SELECT * FROM client WHERE username=?";
+        query = "SELECT * FROM client WHERE email=?";
         st = dbConnection.prepareStatement(query);
-        st.setString(1, username);
+        st.setString(1, email);
 
         rs = st.executeQuery();
 
@@ -68,51 +120,63 @@ public class Webserver {
             }
         }
         else {
-            throw new ClientDoesNotExistException(username);
+            throw new ClientDoesNotExistException(email);
         }
         st.close();
+
+        String hashedToken = setClientSession(email);
+
+        return hashedToken;
     }
 
-    public void validateClientSession(String username) throws SQLException, ClientDoesNotExistException {
-        //TODO: we should not receive a username, we should receive a session cookie later
+    public boolean logout(String email, String hashedToken)
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException, LogoutException {
+
         String query;
         PreparedStatement st;
-        ResultSet rs;
 
-        query = "SELECT COUNT(*) FROM client WHERE username=?";
+        validateSession(email, hashedToken);
+
+        query = "UPDATE client SET token = ? WHERE email = ?";
         st = dbConnection.prepareStatement(query);
-        st.setString(1, username);
+        st.setString(1, "");
+        st.setString(2, email);
 
-        rs = st.executeQuery();
+        int result = st.executeUpdate();
 
-        if (rs.next() && rs.getInt(1) == 0){
-            throw new ClientDoesNotExistException(username);
+        if (result == 0) {
+            throw new LogoutException();
         }
-        st.close();
+
+        return true;
     }
 
-    public List<String> checkPersonalInfo(String username) throws ClientDoesNotExistException, SQLException {
+    public List<String> checkPersonalInfo(String clientEmail, String hashedToken)
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException {
+
         String query;
         PreparedStatement st;
         ResultSet rs;
         List<String> personalInfo = new ArrayList<>();
 
-        validateClientSession(username);
+        validateSession(clientEmail, hashedToken);
 
         // get personal info
-        query = "SELECT address, plan FROM client WHERE username=?";
+        query = "SELECT email, address, plan FROM client WHERE email=?";
         st = dbConnection.prepareStatement(query);
-        st.setString(1, username);
+        st.setString(1, clientEmail);
         rs = st.executeQuery();
 
         if (rs.next()) {
-            String address = rs.getString(1);
-            String plan = rs.getString(2);
+            String email = rs.getString(1);
+            String address = rs.getString(2);
+            String plan = rs.getString(3);
+            personalInfo.add(email);
             personalInfo.add(address);
             personalInfo.add(plan);
         }
         else {
-            throw new ClientDoesNotExistException(username);
+            throw new ClientDoesNotExistException(clientEmail);
         }
 
         st.close();
@@ -120,18 +184,20 @@ public class Webserver {
         return personalInfo;
     }
 
-    public List<Float> checkEnergyConsumption(String username) throws ClientDoesNotExistException, SQLException {
+    public List<Float> checkEnergyConsumption(String email, String hashedToken)
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException {
+
         String query;
         PreparedStatement st;
         ResultSet rs;
         List<Float> energyConsumption = new ArrayList<>();
 
-        validateClientSession(username);
+        validateSession(email, hashedToken);
 
         // get personal info
-        query = "SELECT energyConsumedPerMonth, energyConsumedPerHour FROM client WHERE username=?";
+        query = "SELECT energyConsumedPerMonth, energyConsumedPerHour FROM client WHERE email=?";
         st = dbConnection.prepareStatement(query);
-        st.setString(1, username);
+        st.setString(1, email);
         rs = st.executeQuery();
 
         if (rs.next()) {
@@ -141,7 +207,7 @@ public class Webserver {
             energyConsumption.add(energyConsumedPerHour);
         }
         else {
-            throw new ClientDoesNotExistException(username);
+            throw new ClientDoesNotExistException(email);
         }
 
         st.close();
@@ -149,32 +215,36 @@ public class Webserver {
         return energyConsumption;
     }
 
-    public void updateAddress(String username, String address) throws SQLException, ClientDoesNotExistException {
+    public void updateAddress(String email, String address, String hashedToken)
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
+
         String query;
         PreparedStatement st;
 
-        validateClientSession(username);
+        validateSession(email, hashedToken);
 
         // get personal info
-        query = "UPDATE client SET address = ? WHERE username = ?";
+        query = "UPDATE client SET address = ? WHERE email = ?";
         st = dbConnection.prepareStatement(query);
         st.setString(1, address);
-        st.setString(2, username);
+        st.setString(2, email);
         st.executeUpdate();
         st.close();
     }
 
-    public void updatePlan(String username, String plan) throws SQLException, ClientDoesNotExistException {
+    public void updatePlan(String email, String plan, String hashedToken)
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
+
         String query;
         PreparedStatement st;
 
-        validateClientSession(username);
+        validateSession(email, hashedToken);
 
         // get personal info
-        query = "UPDATE client SET plan = ? WHERE username = ?";
+        query = "UPDATE client SET plan = ? WHERE email = ?";
         st = dbConnection.prepareStatement(query);
         st.setString(1, plan);
-        st.setString(2, username);
+        st.setString(2, email);
         st.executeUpdate();
         st.close();
     }

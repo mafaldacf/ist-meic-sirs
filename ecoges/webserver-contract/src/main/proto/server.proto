@@ -8,7 +8,8 @@ option java_multiple_files = true;
 
 service ServerService {
 	rpc register(RegisterRequest) returns (AckResponse);
-	rpc login(LoginRequest) returns (AckResponse);
+	rpc login(LoginRequest) returns (LoginResponse);
+	rpc logout(LogoutRequest) returns (AckResponse);
 	rpc checkPersonalInfo(CheckPersonalInfoRequest) returns (CheckPersonalInfoResponse);
 	rpc checkEnergyConsumption(CheckEnergyConsumptionRequest) returns (CheckEnergyConsumptionResponse);
 	rpc updateAddress(UpdateAddressRequest) returns (AckResponse);
@@ -24,36 +25,50 @@ message AckResponse {
 	bool ack = 1;
 }
 
-// Register service
+// Register
 message RegisterRequest {
-	string username = 1;
+	string email = 1;
 	string password = 2;
 	string address = 3;
 	PlanType plan = 4;
 }
 
-// Login service
+// Login
 
 message LoginRequest {
-	string username = 1;
+	string email = 1;
 	string password = 2;
 }
 
-// Check personal info service
+message LoginResponse {
+	string hashedToken = 1;
+}
+
+// Logout
+
+message LogoutRequest {
+	string email = 1;
+	string hashedToken = 2;
+}
+
+// Check personal info
 
 message CheckPersonalInfoRequest {
-	string username = 1; // TODO should be replaced by a session cookie generated after login
+	string email = 1;
+	string hashedToken = 2;
 }
 
 message CheckPersonalInfoResponse {
-	string address = 1;
-	PlanType plan = 2;
+	string email = 1;
+	string address = 2;
+	PlanType plan = 3;
 }
 
-// Check energy consumption service
+// Check energy consumption
 
 message CheckEnergyConsumptionRequest {
-	string username = 1; // TODO should be replaced by a session cookie generated after login
+	string email = 1;
+	string hashedToken = 2;
 }
 
 message CheckEnergyConsumptionResponse {
@@ -64,13 +79,15 @@ message CheckEnergyConsumptionResponse {
 // Update personal address
 
 message UpdateAddressRequest {
-	string username = 1; // TODO should be replaced by a session cookie generated after login
+	string email = 1;
 	string address = 2;
+	string hashedToken = 3;
 }
 
 // Update personal plan
 
 message UpdatePlanRequest {
-	string username = 1; // TODO should be replaced by a session cookie generated after login
+	string email = 1;
 	PlanType plan = 2;
+	string hashedToken = 3;
 }

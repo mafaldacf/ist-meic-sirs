@@ -25,7 +25,7 @@ public class BackofficeMain {
 
 	private static String dbURL = "jdbc:mysql://localhost:3306/clientdb"; // default value
 
-	private static int serverPort = 8000;
+	private static int serverPort = 8001;
 
 
 	// Usage: [<serverPort>] [<databaseHost>] [<databasePort>]
@@ -61,7 +61,7 @@ public class BackofficeMain {
 			System.out.println("Setting up database connection on " + dbURL);
 			Class.forName(dbDriver);
 			dbConnection = DriverManager.getConnection(dbURL, dbUser, dbPassword);
-			if (dbConnection != null) populateDatabase();
+			if (dbConnection != null) setupDatabase();
 
 			// Service
 			impl = new BackofficeServiceImpl(dbConnection);
@@ -83,7 +83,7 @@ public class BackofficeMain {
 		}
 	}
 
-	private static void populateDatabase() {
+	private static void setupDatabase() {
 		String query;
 		Statement statement;
 
@@ -95,6 +95,7 @@ public class BackofficeMain {
 			query = "CREATE TABLE admin (id INTEGER NOT NULL AUTO_INCREMENT, " +
 					"username VARCHAR(25) NOT NULL," +
 					"password VARCHAR(25) NOT NULL," +
+					"token VARCHAR(64) DEFAULT ''," +
 					"UNIQUE (username)," +
 					"PRIMARY KEY (id))";
 			statement = dbConnection.createStatement();

@@ -3,9 +3,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
-import pt.ulisboa.tecnico.sirs.backoffice.grpc.HelloRequest;
-import pt.ulisboa.tecnico.sirs.backoffice.grpc.HelloResponse;
-import pt.ulisboa.tecnico.sirs.backoffice.grpc.ServerServiceGrpc;
+import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,34 +26,84 @@ public class Admin {
 		channel.shutdown();
 	}
 
-	public static String hello(String name) {
-		try {
-			HelloRequest request = HelloRequest.newBuilder().setName(name).build();
-			HelloResponse response = server.hello(request);
-			return(response.getResponse());
-		} catch (StatusRuntimeException e) {
-			return(e.getMessage());
-		}
-	}
-
 	public static boolean register(String username, String password) {
-		//TODO
+		try {
+			RegisterRequest request = RegisterRequest.newBuilder()
+					.setUsername(username)
+					.setPassword(password)
+					.build();
+			AckResponse response = server.register(request);
+			return(response.getAck());
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
 		return false;
 	}
 
-	public static boolean login(String username, String password) {
-		//TODO
+	public static String login(String username, String password) {
+		try {
+			LoginRequest request = LoginRequest.newBuilder()
+					.setUsername(username)
+					.setPassword(password)
+					.build();
+			LoginResponse response = server.login(request);
+			return(response.getHashedToken());
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
+		return null;
+	}
+
+	public static boolean logout(String username, String hashedToken) {
+		try {
+			LogoutRequest request = LogoutRequest.newBuilder()
+					.setUsername(username)
+					.setHashedToken(hashedToken)
+					.build();
+			AckResponse response = server.logout(request);
+			return(response.getAck());
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
 		return false;
 	}
 
-	public static String listUsers() {
-		//TODO
-		return "";
+	public static String listClients(String username, String hashedToken) {
+		String clients = new String();
+		try {
+			ListClientsRequest request = ListClientsRequest.newBuilder()
+					.setUsername(username)
+					.setHashedToken(hashedToken)
+					.build();
+			ListClientsResponse response = server.listClients(request);
+
+			for (Client client: response.getClientsList()) {
+				clients += "Username: " + client.getEmail()
+						+ ", Address: " + client.getAddress()
+						+ ", Plan: " + client.getPlanType().name()
+						+ ", Energy Consumed Per Month: " + client.getEnergyConsumedPerMonth()
+						+ ", Energy Consumed Per Hour: " + client.getEnergyConsumedPerHour()
+						+ "\n";
+			}
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
+		return clients;
 	}
 
-	public static String checkUser(int id) {
-		//TODO
-		return "";
+	public static boolean deleteClient(String username, String email, String hashedToken) {
+		try {
+			DeleteClientRequest request = DeleteClientRequest.newBuilder()
+					.setUsername(username)
+					.setEmail(email)
+					.setHashedToken(hashedToken)
+					.build();
+			AckResponse response = server.deleteClient(request);
+			return(response.getAck());
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
+		return false;
 	}
 }
 

@@ -61,7 +61,7 @@ public class WebserverMain {
 			System.out.println("Setting up database connection on " + dbURL);
 			Class.forName(dbDriver);
 			dbConnection = DriverManager.getConnection(dbURL, dbUser, dbPassword);
-			if (dbConnection != null) populateDatabase();
+			if (dbConnection != null) setupDatabase();
 
 			// Service
 			impl = new WebserverServiceImpl(dbConnection);
@@ -83,7 +83,7 @@ public class WebserverMain {
 		}
 	}
 
-	private static void populateDatabase() {
+	private static void setupDatabase() {
 		String query;
 		Statement statement;
 
@@ -92,18 +92,20 @@ public class WebserverMain {
 			statement = dbConnection.createStatement();
 			statement.execute(query);
 
-			query = "CREATE TABLE client (id INTEGER NOT NULL AUTO_INCREMENT, " +
-					"username VARCHAR(25) NOT NULL," +
+			query = "CREATE TABLE client (" +
+					"id INTEGER NOT NULL AUTO_INCREMENT, " +
+					"email VARCHAR(50) NOT NULL," +
 					"password VARCHAR(25) NOT NULL," +
 					"address VARCHAR(25) NOT NULL," +
 					"plan VARCHAR(15) DEFAULT 'FLAT_RATE'," + // plan = FLAT_RATE or BI_HOURLY_RATE
 					"energyConsumedPerMonth DECIMAL(15, 2) DEFAULT 0, " +
 					"energyConsumedPerHour DECIMAL(15, 2) DEFAULT 0," +
-					"UNIQUE (username)," +
+					"token VARCHAR(64) DEFAULT ''," +
+					"UNIQUE (email)," +
 					"PRIMARY KEY (id))";
 			statement = dbConnection.createStatement();
 			statement.execute(query);
-			System.out.println("Successfully populated database.");
+			System.out.println("Database is ready!");
 		} catch (SQLException e) {
 			System.out.println("Could not populate database: "+ e.getMessage());
 		}

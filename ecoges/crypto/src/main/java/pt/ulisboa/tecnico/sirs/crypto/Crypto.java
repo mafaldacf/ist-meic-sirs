@@ -6,16 +6,34 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 
 public class Crypto {
 
-    /* Utils for Key Pairs with RSA */
-
-    public static String hashMyKey(String message) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+    public static String hash(String message) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
         final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        final byte[] hashbytes = digest.digest( message.getBytes(StandardCharsets.UTF_8));
-        return bytesToHex(hashbytes);
+        final byte[] bytes = digest.digest( message.getBytes(StandardCharsets.UTF_8));
+        return bytesToHex(bytes);
 
+    }
+
+    public static String generateToken() {
+        SecureRandom random = new SecureRandom();
+        byte bytes[] = new byte[20];
+        random.nextBytes(bytes);
+        return java.time.LocalDate.now() + bytesToHex(bytes);
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder hexString = new StringBuilder(2 * bytes.length);
+        for (int i = 0; i < bytes.length; i++) {
+            String hex = Integer.toHexString(0xff & bytes[i]);
+            if(hex.length() == 1) {
+                hexString.append('0');
+            }
+            hexString.append(hex);
+        }
+        return hexString.toString();
     }
 
     public static KeyPair generateKeyPair() throws NoSuchAlgorithmException {
@@ -60,16 +78,5 @@ public class Crypto {
         return signer.verify(signedMessage);
     }
 
-   private static String bytesToHex(byte[] hash) {
-        StringBuilder hexString = new StringBuilder(2 * hash.length);
-        for (int i = 0; i < hash.length; i++) {
-            String hex = Integer.toHexString(0xff & hash[i]);
-            if(hex.length() == 1) {
-                hexString.append('0');
-            }
-            hexString.append(hex);
-        }
-        return hexString.toString();
-    }
 
 }

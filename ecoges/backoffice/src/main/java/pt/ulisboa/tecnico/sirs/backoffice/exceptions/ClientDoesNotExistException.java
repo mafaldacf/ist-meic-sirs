@@ -1,4 +1,4 @@
-package pt.ulisboa.tecnico.sirs.webserver.exceptions;
+package pt.ulisboa.tecnico.sirs.backoffice.exceptions;
 
 public class ClientDoesNotExistException extends Exception {
 

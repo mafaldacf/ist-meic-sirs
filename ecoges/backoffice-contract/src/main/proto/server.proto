@@ -6,14 +6,66 @@ package pt.ulisboa.tecnico.sirs.backoffice.grpc;
 
 option java_multiple_files = true;
 
-message HelloRequest{
-	string name = 1;
-}
-
-message HelloResponse{
-	string response = 1;
-}
-
 service ServerService {
-	rpc hello(HelloRequest) returns (HelloResponse);
+	rpc register(RegisterRequest) returns (AckResponse);
+	rpc login(LoginRequest) returns (LoginResponse);
+	rpc logout(LogoutRequest) returns (AckResponse);
+	rpc listClients(ListClientsRequest) returns (ListClientsResponse);
+	rpc deleteClient(DeleteClientRequest) returns (AckResponse);
+}
+
+enum PlanType {
+	FLAT_RATE = 0;
+	BI_HOURLY_RATE = 1;
+}
+
+message AckResponse {
+	bool ack = 1;
+}
+
+message Client {
+	string email = 1;
+	string address = 2;
+	PlanType planType = 3;
+	float energyConsumedPerMonth = 4;
+	float energyConsumedPerHour = 5;
+}
+
+// Register
+message RegisterRequest {
+	string username = 1;
+	string password = 2;
+}
+
+// Login
+message LoginRequest {
+	string username = 1;
+	string password = 2;
+}
+
+message LoginResponse {
+	string hashedToken = 1;
+}
+
+// Logout
+message LogoutRequest {
+	string username = 1;
+	string hashedToken = 2;
+}
+
+// List clients
+message ListClientsRequest {
+	string username = 1;
+	string hashedToken = 2;
+}
+
+message ListClientsResponse {
+	repeated Client clients = 1;
+}
+
+// Delete client
+message DeleteClientRequest {
+	string username = 1;
+	string email = 2;
+	string hashedToken = 3;
 }

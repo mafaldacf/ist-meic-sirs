@@ -5,7 +5,10 @@ import java.util.Scanner;
 
 public class AdminMain {
 	private static String serverHost = "localhost";
-	private static int serverPort = 8000;
+	private static int serverPort = 8001;
+
+	private static String username = null;
+	private static String hashedToken = null;
 
 	// Usage: [<serverHost>] [<serverPort>]
 	public static void main(String[] args) {
@@ -33,7 +36,7 @@ public class AdminMain {
 	}
 
 	public static void register(){
-		String username, password;
+		String password;
 		Scanner scanner = new Scanner(System.in);
 
 		System.out.print("Enter a username: ");
@@ -49,16 +52,18 @@ public class AdminMain {
 	}
 
 	public static void login(){
-		String username, password;
+		String password;
 		Scanner scanner = new Scanner(System.in);
 
 		System.out.print("Enter your username: ");
 		username = scanner.nextLine();
 		System.out.print("Enter your password: ");
 		password = scanner.nextLine();
-		if (Admin.login(username, password)) {
+
+		hashedToken = Admin.login(username, password);
+		if (hashedToken != null) {
 			System.out.println("Login successful.");
-			showMenu(username);
+			showMenu();
 		}
 		else {
 			System.out.println("Could not login into the system. Please try again.");
@@ -66,13 +71,12 @@ public class AdminMain {
 	}
 
 	public static void showInterface() {
-		String input, result;
+		String input;
 		Scanner scanner = new Scanner(System.in);
 		while(true) {
 			System.out.println("\nPlease select one option:\n" +
 					"1. Register\n" +
 					"2. Login\n" +
-					"3. Test connection with Hello\n" +
 					"0. Exit");
 			System.out.print("> ");
 
@@ -84,16 +88,10 @@ public class AdminMain {
 				case "2":
 					login();
 					continue;
-				case "3":
-					System.out.print("Enter your name: ");
-					input = scanner.nextLine();
-					result = Admin.hello(input);
-					System.out.println(result);
-					continue;
 				case "0":
 					scanner.close();
 					Admin.close();
-					System.out.println("Exiting employee...");
+					System.out.println("Exiting..");
 					return;
 				default:
 					System.out.println("Invalid command.");
@@ -102,42 +100,39 @@ public class AdminMain {
 		}
 	}
 
-	public static void showMenu(String username) {
+	public static void showMenu() {
 		String input, result;
+		boolean success;
 		Scanner scanner = new Scanner(System.in);
-		System.out.println("Welcome " + username);
+		System.out.println("Welcome, " + username + "!");
 		while(true) {
 			try {
 				System.out.println("\nPlease select one option:\n" +
-						"1. List Users\n" +
-						"2. Check User\n" +
-						"3. Test connection with Hello\n" +
+						"1. List Clients\n" +
+						"2. Delete Client\n" +
 						"0. Logout");
 				System.out.print("> ");
 
 				input = scanner.nextLine();
 				switch(input) {
 					case "1":
-						result = Admin.listUsers();
+						result = Admin.listClients(username, hashedToken);
 						System.out.println(result);
 						continue;
 					case "2":
-						System.out.print("Please enter a valid user ID: ");
+						System.out.print("Enter a client email to delete: ");
 						input = scanner.nextLine();
-						result = Admin.checkUser(Integer.parseInt(input));
-						System.out.println(result);
-						continue;
-					case "3":
-						System.out.print("Enter your name: ");
-						input = scanner.nextLine();
-						result = Admin.hello(input);
-						System.out.println(result);
+						success = Admin.deleteClient(username, input, hashedToken);
+						if (success) {
+							System.out.println("Successfully deleted client.");
+						}
 						continue;
 					case "0":
-						scanner.close();
-						Admin.close();
-						System.out.println("Exiting employee...");
-						return;
+						success = Admin.logout(username, hashedToken);
+						if (success) {
+							System.out.println("Logged out.");
+							return;
+						}
 					default:
 						System.out.println("Invalid command.");
 

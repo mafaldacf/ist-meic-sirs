@@ -26,10 +26,10 @@ public class Client {
 		channel.shutdown();
 	}
 
-	public static boolean register(String username, String password, String address, int plan) {
+	public static boolean register(String email, String password, String address, int plan) {
 		try {
 			RegisterRequest request = RegisterRequest.newBuilder()
-					.setUsername(username)
+					.setEmail(email)
 					.setPassword(password)
 					.setAddress(address)
 					.setPlan(PlanType.forNumber(plan-1))
@@ -42,10 +42,24 @@ public class Client {
 		return false;
 	}
 
-	public static boolean login(String username, String password) {
+	public static String login(String email, String password) {
 		try {
-			LoginRequest request = LoginRequest.newBuilder().setUsername(username).setPassword(password).build();
-			AckResponse response = server.login(request);
+			LoginRequest request = LoginRequest.newBuilder().setEmail(email).setPassword(password).build();
+			LoginResponse response = server.login(request);
+			return(response.getHashedToken());
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
+		return null;
+	}
+
+	public static boolean logout(String email, String hashedToken) {
+		try {
+			LogoutRequest request = LogoutRequest.newBuilder()
+					.setEmail(email)
+					.setHashedToken(hashedToken)
+					.build();
+			AckResponse response = server.logout(request);
 			return(response.getAck());
 		} catch (StatusRuntimeException e) {
 			System.out.println(e.getMessage());
@@ -53,22 +67,30 @@ public class Client {
 		return false;
 	}
 
-	public static String checkPersonalInfo(String username) {
+	public static String checkPersonalInfo(String email, String hashedToken) {
 		String result = new String();
 		try {
-			CheckPersonalInfoRequest request = CheckPersonalInfoRequest.newBuilder().setUsername(username).build();
+			CheckPersonalInfoRequest request = CheckPersonalInfoRequest.newBuilder()
+					.setEmail(email)
+					.setHashedToken(hashedToken)
+					.build();
 			CheckPersonalInfoResponse response = server.checkPersonalInfo(request);
-			result += "Address: " + response.getAddress() + ", Plan: " + response.getPlan().name();
+			result += "Email: " + response.getEmail()
+						+ ", Address: " + response.getAddress()
+						+ ", Plan: " + response.getPlan().name();
 		} catch (StatusRuntimeException e) {
 			System.out.println(e.getMessage());
 		}
 		return result;
 	}
 
-	public static String checkEnergyConsumption(String username) {
+	public static String checkEnergyConsumption(String email, String hashedToken) {
 		String result = new String();
 		try {
-			CheckEnergyConsumptionRequest request = CheckEnergyConsumptionRequest.newBuilder().setUsername(username).build();
+			CheckEnergyConsumptionRequest request = CheckEnergyConsumptionRequest.newBuilder()
+					.setEmail(email)
+					.setHashedToken(hashedToken)
+					.build();
 			CheckEnergyConsumptionResponse response = server.checkEnergyConsumption(request);
 			result += "Energy Consumption per Month: " + response.getEnergyConsumedPerMonth()
 					+ ", Energy Consumption per Hour: " + response.getEnergyConsumedPerHour();
@@ -78,11 +100,12 @@ public class Client {
 		return result;
 	}
 
-	public static boolean updateAddress(String username, String address) {
+	public static boolean updateAddress(String email, String address, String hashedToken) {
 		try {
 			UpdateAddressRequest request = UpdateAddressRequest.newBuilder()
-					.setUsername(username)
+					.setEmail(email)
 					.setAddress(address)
+					.setHashedToken(hashedToken)
 					.build();
 			AckResponse response = server.updateAddress(request);
 			return response.getAck();
@@ -92,11 +115,12 @@ public class Client {
 		return false;
 	}
 
-	public static boolean updatePlan(String username, int plan) {
+	public static boolean updatePlan(String email, int plan, String hashedToken) {
 		try {
 			UpdatePlanRequest request = UpdatePlanRequest.newBuilder()
-					.setUsername(username)
+					.setEmail(email)
 					.setPlan(PlanType.forNumber(plan-1))
+					.setHashedToken(hashedToken)
 					.build();
 			AckResponse response = server.updatePlan(request);
 			return response.getAck();

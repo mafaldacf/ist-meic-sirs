@@ -7,6 +7,9 @@ public class ClientMain {
 	private static String serverHost = "localhost";
 	private static int serverPort = 8000;
 
+	private static String hashedToken = null;
+	private static String email = null;
+
 	// Usage: [<serverHost>] [<serverPort>]
 	public static void main(String[] args) {
 		try {
@@ -64,11 +67,11 @@ public class ClientMain {
 	}
 
 	public static void register(){
-		String username, password, address, option;
+		String password, address;
 		Scanner scanner = new Scanner(System.in);
 
-		System.out.print("Enter a username: ");
-		username = scanner.nextLine();
+		System.out.print("Enter a email: ");
+		email = scanner.nextLine();
 		System.out.print("Enter a password: ");
 		password = scanner.nextLine();
 		System.out.print("Enter an address: ");
@@ -76,8 +79,8 @@ public class ClientMain {
 
 		int plan = getPlan();
 
-		if (Client.register(username, password, address, plan)) {
-			System.out.println("Successfully registered with username '" + username + "'. Please login.");
+		if (Client.register(email, password, address, plan)) {
+			System.out.println("Successfully registered with email '" + email + "'. Please login.");
 		}
 		else{
 			System.out.println("Could not register in the system. Please try again.");
@@ -85,16 +88,18 @@ public class ClientMain {
 	}
 
 	public static void login(){
-		String username, password;
+		String password;
 		Scanner scanner = new Scanner(System.in);
 
-		System.out.print("Enter your username: ");
-		username = scanner.nextLine();
+		System.out.print("Enter your email: ");
+		email = scanner.nextLine();
 		System.out.print("Enter your password: ");
 		password = scanner.nextLine();
-		if (Client.login(username, password)) {
+
+		hashedToken = Client.login(email, password);
+		if (hashedToken != null) {
 			System.out.println("Login successful.");
-			showMenu(username);
+			showMenu();
 		}
 	}
 
@@ -128,11 +133,11 @@ public class ClientMain {
 		}
 	}
 
-	public static void showMenu(String username) {
+	public static void showMenu() {
 		String input, result;
 		boolean success;
 		Scanner scanner = new Scanner(System.in);
-		System.out.println("Welcome, " + username + "!");
+		System.out.println("Welcome, " + email + "!");
 		while(true) {
 			try {
 				System.out.println("\nPlease select one option:\n" +
@@ -146,17 +151,17 @@ public class ClientMain {
 				input = scanner.nextLine();
 				switch(input) {
 					case "1":
-						result = Client.checkPersonalInfo(username); //TODO this should be a session cookie, not username
+						result = Client.checkPersonalInfo(email, hashedToken);
 						System.out.println(result);
 						continue;
 					case "2":
-						result = Client.checkEnergyConsumption(username); //TODO this should be a session cookie, not username
+						result = Client.checkEnergyConsumption(email, hashedToken);
 						System.out.println(result);
 						continue;
 					case "3":
 						System.out.print("Insert a new address: ");
 						input = scanner.nextLine();
-						success = Client.updateAddress(username, input);
+						success = Client.updateAddress(email, input, hashedToken);
 						if (success) {
 							System.out.println("Successfully updated address.");
 						}
@@ -165,11 +170,15 @@ public class ClientMain {
 						int plan = getPlan();
 						if (plan == -1) return;
 
-						success = Client.updatePlan(username, plan);
+						success = Client.updatePlan(email, plan, hashedToken);
 						if (success) System.out.println("Successfully updated plan.");
 						continue;
 					case "0":
-						return;
+						success = Client.logout(email, hashedToken);
+						if (success) {
+							System.out.println("Logged out.");
+							return;
+						}
 					default:
 						System.out.println("Invalid command.");
 

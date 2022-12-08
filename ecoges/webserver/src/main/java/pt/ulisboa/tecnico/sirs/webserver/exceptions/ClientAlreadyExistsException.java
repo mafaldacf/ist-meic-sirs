@@ -4,7 +4,7 @@ public class ClientAlreadyExistsException extends Exception {
 
     private static final long serialVersionUID = 1L;
 
-    public ClientAlreadyExistsException(String username) {
-        super("Client with username '" + username + "' already exists.");
+    public ClientAlreadyExistsException(String email) {
+        super("Client with email '" + email + "' already exists.");
     }
 }
