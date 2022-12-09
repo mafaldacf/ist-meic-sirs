@@ -12,6 +12,8 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import static pt.ulisboa.tecnico.sirs.backoffice.DatabaseQueries.*;
+
 public class Backoffice {
 
     private final Connection dbConnection;
@@ -29,7 +31,7 @@ public class Backoffice {
         String token = Crypto.generateToken();
         String hashedToken = Crypto.hash(token);
 
-        query = "UPDATE admin SET token = ? WHERE username = ?";
+        query = UPDATE_ADMIN_TOKEN;
         st = dbConnection.prepareStatement(query);
         st.setString(1, hashedToken);
         st.setString(2, username);
@@ -46,7 +48,7 @@ public class Backoffice {
         PreparedStatement st;
         ResultSet rs;
 
-        query = "SELECT COUNT(*) FROM admin WHERE username = ?";
+        query = READ_ADMIN_COUNT;
         st = dbConnection.prepareStatement(query);
         st.setString(1, username);
         rs = st.executeQuery();
@@ -56,7 +58,7 @@ public class Backoffice {
         }
         st.close();
 
-        query = "SELECT token FROM admin WHERE username = ?";
+        query = READ_ADMIN_TOKEN;
         st = dbConnection.prepareStatement(query);
         st.setString(1, username);
         rs = st.executeQuery();
@@ -77,7 +79,7 @@ public class Backoffice {
         ResultSet rs;
 
         // check if username is already registered
-        query = "SELECT COUNT(*) FROM admin WHERE username=?";
+        query = READ_ADMIN_COUNT;
         st = dbConnection.prepareStatement(query);
         st.setString(1, username);
 
@@ -90,7 +92,7 @@ public class Backoffice {
         st.close();
 
         // register username
-        query = "INSERT INTO admin(username, password) VALUES(?, ?)";
+        query = CREATE_ADMIN;
         st = dbConnection.prepareStatement(query);
 
         st.setString(1, username);
@@ -110,7 +112,7 @@ public class Backoffice {
         PreparedStatement st;
         ResultSet rs;
 
-        query = "SELECT * FROM admin WHERE username = ?";
+        query = READ_ADMIN;
         st = dbConnection.prepareStatement(query);
         st.setString(1, username);
 
@@ -139,7 +141,7 @@ public class Backoffice {
 
         validateSession(username, hashedToken);
 
-        query = "UPDATE admin SET token = ? WHERE username = ?";
+        query = UPDATE_ADMIN_TOKEN;
         st = dbConnection.prepareStatement(query);
         st.setString(1, "");
         st.setString(2, username);
@@ -164,7 +166,7 @@ public class Backoffice {
 
         validateSession(username, hashedToken);
 
-        query = "SELECT email, address, plan, energyConsumedPerMonth, energyConsumedPerHour FROM client";
+        query = READ_ALL_CLIENTS_INFO;
         st = dbConnection.createStatement();
         rs = st.executeQuery(query);
 
@@ -198,7 +200,7 @@ public class Backoffice {
 
         validateSession(username, hashedToken);
 
-        query = "DELETE FROM client WHERE email = ?";
+        query = DELETE_CLIENT;
         st = dbConnection.prepareStatement(query);
         st.setString(1, email);
         int success = st.executeUpdate();

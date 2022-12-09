@@ -10,6 +10,8 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
+
 public class Webserver {
     private final Connection dbConnection;
 
@@ -26,7 +28,7 @@ public class Webserver {
         String token = Crypto.generateToken();
         String hashedToken = Crypto.hash(token);
 
-        query = "UPDATE client SET token = ? WHERE email = ?";
+        query = UPDATE_CLIENT_TOKEN;
         st = dbConnection.prepareStatement(query);
         st.setString(1, hashedToken);
         st.setString(2, email);
@@ -43,7 +45,7 @@ public class Webserver {
         PreparedStatement st;
         ResultSet rs;
 
-        query = "SELECT COUNT(*) FROM client WHERE email = ?";
+        query = READ_CLIENT_COUNT;
         st = dbConnection.prepareStatement(query);
         st.setString(1, email);
         rs = st.executeQuery();
@@ -53,7 +55,7 @@ public class Webserver {
         }
         st.close();
 
-        query = "SELECT token FROM client WHERE email = ?";
+        query = READ_CLIENT_TOKEN;
         st = dbConnection.prepareStatement(query);
         st.setString(1, email);
         rs = st.executeQuery();
@@ -72,7 +74,7 @@ public class Webserver {
         ResultSet rs;
 
         // check if email is already registered
-        query = "SELECT COUNT(*) FROM client WHERE email=?";
+        query = READ_CLIENT_COUNT;
         st = dbConnection.prepareStatement(query);
         st.setString(1, email);
 
@@ -88,8 +90,7 @@ public class Webserver {
         float energyConsumedPerMonth = (float)(Math.random()*300);
         float energyConsumedPerHour = energyConsumedPerMonth/700;
 
-        query = "INSERT INTO client(email, password, address, plan, energyConsumedPerMonth, energyConsumedPerHour) " +
-                "VALUES(?, ?, ?, ?, ?, ?)";
+        query = CREATE_CLIENT;
         st = dbConnection.prepareStatement(query);
         st.setString(1, email);
         st.setString(2, password);
@@ -112,7 +113,7 @@ public class Webserver {
         PreparedStatement st;
         ResultSet rs;
 
-        query = "SELECT * FROM client WHERE email=?";
+        query = READ_CLIENT;
         st = dbConnection.prepareStatement(query);
         st.setString(1, email);
 
@@ -142,7 +143,7 @@ public class Webserver {
 
         validateSession(email, hashedToken);
 
-        query = "UPDATE client SET token = ? WHERE email = ?";
+        query = UPDATE_CLIENT_TOKEN;
         st = dbConnection.prepareStatement(query);
         st.setString(1, "");
         st.setString(2, email);
@@ -167,7 +168,7 @@ public class Webserver {
         validateSession(clientEmail, hashedToken);
 
         // get personal info
-        query = "SELECT email, address, plan FROM client WHERE email=?";
+        query = READ_CLIENT_PERSONAL_INFO;
         st = dbConnection.prepareStatement(query);
         st.setString(1, clientEmail);
         rs = st.executeQuery();
@@ -199,8 +200,8 @@ public class Webserver {
 
         validateSession(email, hashedToken);
 
-        // get personal info
-        query = "SELECT energyConsumedPerMonth, energyConsumedPerHour FROM client WHERE email=?";
+        // get energy consumption
+        query = READ_CLIENT_ENERGY_CONSUMPTION;
         st = dbConnection.prepareStatement(query);
         st.setString(1, email);
         rs = st.executeQuery();
@@ -228,8 +229,8 @@ public class Webserver {
 
         validateSession(email, hashedToken);
 
-        // get personal info
-        query = "UPDATE client SET address = ? WHERE email = ?";
+        // update address
+        query = UPDATE_CLIENT_ADDRESS;
         st = dbConnection.prepareStatement(query);
         st.setString(1, address);
         st.setString(2, email);
@@ -245,8 +246,8 @@ public class Webserver {
 
         validateSession(email, hashedToken);
 
-        // get personal info
-        query = "UPDATE client SET plan = ? WHERE email = ?";
+        // update plan
+        query = UPDATE_CLIENT_PLAN;
         st = dbConnection.prepareStatement(query);
         st.setString(1, plan);
         st.setString(2, email);
