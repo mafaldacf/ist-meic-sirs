@@ -10,6 +10,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBase {
@@ -23,7 +24,7 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 	public void register(RegisterRequest request, StreamObserver<AckResponse> responseObserver) {
 		AckResponse.Builder builder = AckResponse.newBuilder();
 		try {
-			server.register(request.getEmail(), request.getPassword(), request.getAddress(), request.getPlan().name());
+			server.register(request.getName(), request.getEmail(), request.getPassword(), request.getAddress(), request.getIBAN(), request.getPlan().name());
 
 			builder.setAck(true);
 
@@ -33,6 +34,8 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (ClientAlreadyExistsException e){
 			responseObserver.onError(Status.ALREADY_EXISTS.withDescription(e.getMessage()).asRuntimeException());
+		} catch (NoSuchAlgorithmException e) {
+			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
 
@@ -40,9 +43,10 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 	public void login(LoginRequest request, StreamObserver<LoginResponse> responseObserver) {
 		LoginResponse.Builder builder = LoginResponse.newBuilder();
 		try {
-			String hashedToken = server.login(request.getEmail(), request.getPassword());
+			ArrayList<String> response = server.login(request.getEmail(), request.getPassword());
 
-			builder.setHashedToken(hashedToken);
+			builder.setName(response.get(0));
+			builder.setHashedToken(response.get(1));
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
@@ -57,15 +61,47 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 	public void logout(LogoutRequest request, StreamObserver<AckResponse> responseObserver) {
 		AckResponse.Builder builder = AckResponse.newBuilder();
 		try {
-			boolean ack = server.logout(request.getEmail(), request.getHashedToken());
+			server.logout(request.getEmail(), request.getHashedToken());
 
-			builder.setAck(ack);
+		} catch (SQLException | ClientDoesNotExistException | InvalidSessionTokenException e){
+			// do nothing, client should be able to logout
+		}
+
+		builder.setAck(true);
+		responseObserver.onNext(builder.build());
+		responseObserver.onCompleted();
+	}
+
+	@Override
+	public void addAppliance(AddEquipmentRequest request, StreamObserver<AckResponse> responseObserver) {
+		AckResponse.Builder builder = AckResponse.newBuilder();
+		try {
+			server.addApplicance(request.getEmail(), request.getEquipmentName(), request.getEquipmentBrand(), request.getHashedToken());
+
+			builder.setAck(true);
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (RuntimeException | ClientDoesNotExistException | InvalidSessionTokenException | LogoutException e) {
+		} catch (ApplianceAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException e){
+			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		}
+	}
+
+	@Override
+	public void addSolarPanel(AddEquipmentRequest request, StreamObserver<AckResponse> responseObserver) {
+		AckResponse.Builder builder = AckResponse.newBuilder();
+		try {
+			server.addSolarPanel(request.getEmail(), request.getEquipmentName(), request.getEquipmentBrand(), request.getHashedToken());
+
+			builder.setAck(true);
+
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (SQLException e){
+			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+		} catch (SolarPanelAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -74,11 +110,9 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 	public void checkPersonalInfo(CheckPersonalInfoRequest request, StreamObserver<CheckPersonalInfoResponse> responseObserver) {
 		CheckPersonalInfoResponse.Builder builder = CheckPersonalInfoResponse.newBuilder();
 		try {
-			List<String> personalInfo = server.checkPersonalInfo(request.getEmail(), request.getHashedToken());
+			PersonalInfo personalInfo = server.checkPersonalInfo(request.getEmail(), request.getHashedToken());
 
-			builder.setEmail(personalInfo.get(0));
-			builder.setAddress(personalInfo.get(1));
-			builder.setPlan(PlanType.valueOf(personalInfo.get(2)));
+			builder.setPersonalInfo(personalInfo);
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
@@ -90,13 +124,29 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 	}
 
 	@Override
-	public void checkEnergyConsumption(CheckEnergyConsumptionRequest request, StreamObserver<CheckEnergyConsumptionResponse> responseObserver) {
-		CheckEnergyConsumptionResponse.Builder builder = CheckEnergyConsumptionResponse.newBuilder();
+	public void checkEnergyPanel(CheckEnergyPanelRequest request, StreamObserver<CheckEnergyPanelResponse> responseObserver) {
+		CheckEnergyPanelResponse.Builder builder = CheckEnergyPanelResponse.newBuilder();
 		try {
-			List<Float> energyConsumption = server.checkEnergyConsumption(request.getEmail(), request.getHashedToken());
+			EnergyPanel energyPanel = server.checkEnergyPanel(request.getEmail(), request.getHashedToken());
 
-			builder.setEnergyConsumedPerMonth(energyConsumption.get(0));
-			builder.setEnergyConsumedPerHour(energyConsumption.get(1));
+			builder.setEnergyPanel(energyPanel);
+
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (SQLException e){
+			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		}
+	}
+
+	@Override
+	public void checkInvoices(CheckInvoicesRequest request, StreamObserver<CheckInvoicesResponse> responseObserver) {
+		CheckInvoicesResponse.Builder builder = CheckInvoicesResponse.newBuilder();
+		try {
+			List<Invoice> invoices = server.checkInvoices(request.getEmail(), request.getHashedToken());
+
+			builder.addAllInvoices(invoices);
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();

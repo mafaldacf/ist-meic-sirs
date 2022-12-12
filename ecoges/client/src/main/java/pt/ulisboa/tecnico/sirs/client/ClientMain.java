@@ -1,6 +1,7 @@
 package pt.ulisboa.tecnico.sirs.client;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Scanner;
 
 public class ClientMain {
@@ -8,6 +9,7 @@ public class ClientMain {
 	private static int serverPort = 8000;
 
 	private static String hashedToken = null;
+	private static String name = null;
 	private static String email = null;
 
 	// Usage: [<serverHost>] [<serverPort>]
@@ -31,7 +33,7 @@ public class ClientMain {
 			Client.init(serverHost, serverPort);
 			showInterface();
 		} catch (IOException e) {
-			System.out.println("Could not start employee. Invalid backoffice certificate.");
+			System.out.println("Could not start client. Invalid webserver certificate.");
 		}
 	}
 
@@ -67,19 +69,23 @@ public class ClientMain {
 	}
 
 	public static void register(){
-		String password, address;
+		String password, address, name, iban;
 		Scanner scanner = new Scanner(System.in);
 
-		System.out.print("Enter a email: ");
+		System.out.print("Enter your name: ");
+		name = scanner.nextLine();
+		System.out.print("Enter your email: ");
 		email = scanner.nextLine();
-		System.out.print("Enter a password: ");
+		System.out.print("Enter your password: ");
 		password = scanner.nextLine();
-		System.out.print("Enter an address: ");
+		System.out.print("Enter your address: ");
 		address = scanner.nextLine();
+		System.out.print("Enter your bank account IBAN: ");
+		iban = scanner.nextLine();
 
 		int plan = getPlan();
 
-		if (Client.register(email, password, address, plan)) {
+		if (plan != -1 && Client.register(name, email, password, address, iban, plan)) {
 			System.out.println("Successfully registered with email '" + email + "'. Please login.");
 		}
 		else{
@@ -96,15 +102,17 @@ public class ClientMain {
 		System.out.print("Enter your password: ");
 		password = scanner.nextLine();
 
-		hashedToken = Client.login(email, password);
-		if (hashedToken != null) {
+		ArrayList<String> response = Client.login(email, password);
+		if (response != null) {
+			name = response.get(0);
+			hashedToken = response.get(1);
 			System.out.println("Login successful.");
 			showMenu();
 		}
 	}
 
 	public static void showInterface() {
-		String input, result;
+		String input;
 		Scanner scanner = new Scanner(System.in);
 		while(true) {
 			System.out.println("\nPlease select one option:\n" +
@@ -134,17 +142,20 @@ public class ClientMain {
 	}
 
 	public static void showMenu() {
-		String input, result;
+		String input, result, equipmentName, equipmentBrand;
 		boolean success;
 		Scanner scanner = new Scanner(System.in);
-		System.out.println("Welcome, " + email + "!");
+		System.out.println("Welcome, " + name + "!");
 		while(true) {
 			try {
 				System.out.println("\nPlease select one option:\n" +
 						"1. Check personal info\n" +
-						"2. Check energy consumption\n" +
-						"3. Update address\n" +
-						"4. Update plan\n" +
+						"2. Check energy panel\n" +
+						"3. Check invoices\n" +
+						"4. Add appliance \n" +
+						"5. Add solar panel \n" +
+						"6. Update address\n" +
+						"7. Update plan\n" +
 						"0. Logout");
 				System.out.print("> ");
 
@@ -155,10 +166,34 @@ public class ClientMain {
 						System.out.println(result);
 						continue;
 					case "2":
-						result = Client.checkEnergyConsumption(email, hashedToken);
+						result = Client.checkEnergyPanel(email, hashedToken);
 						System.out.println(result);
 						continue;
 					case "3":
+						result = Client.checkInvoices(email, hashedToken);
+						System.out.println(result);
+						continue;
+					case "4":
+						System.out.print("Insert the name for the new appliance: ");
+						equipmentName = scanner.nextLine();
+						System.out.print("Insert the brand for the new appliance: ");
+						equipmentBrand = scanner.nextLine();
+						success = Client.addAppliance(email, equipmentName, equipmentBrand, hashedToken);
+						if (success) {
+							System.out.println("Successfully added new appliance '" + equipmentName + "'.");
+						}
+						continue;
+					case "5":
+						System.out.print("Insert the name for the new solar panel: ");
+						equipmentName = scanner.nextLine();
+						System.out.print("Insert the brand for the new solar panel: ");
+						equipmentBrand = scanner.nextLine();
+						success = Client.addSolarPanel(email, equipmentName, equipmentBrand, hashedToken);
+						if (success) {
+							System.out.println("Successfully added new solar panel '" + equipmentName + "'.");
+						}
+						continue;
+					case "6":
 						System.out.print("Insert a new address: ");
 						input = scanner.nextLine();
 						success = Client.updateAddress(email, input, hashedToken);
@@ -166,9 +201,9 @@ public class ClientMain {
 							System.out.println("Successfully updated address.");
 						}
 						continue;
-					case "4":
+					case "7":
 						int plan = getPlan();
-						if (plan == -1) return;
+						if (plan == -1) continue;
 
 						success = Client.updatePlan(email, plan, hashedToken);
 						if (success) System.out.println("Successfully updated plan.");
@@ -184,7 +219,7 @@ public class ClientMain {
 
 				}
 			} catch (NumberFormatException e) {
-				System.out.println("Invalid user ID.");
+				System.out.println("Invalid command.");
 			}
 		}
 	}

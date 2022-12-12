@@ -31,14 +31,17 @@ openssl req -new -key database.key -out database.csr -subj "/C=PT/ST=Lisbon/L=Li
 # Sign webserver certificate
 
 openssl x509 -req -days 365 -in webserver.csr -CA ca.crt -CAkey ca.key -extfile webserver-domains.ext -set_serial 01 -out webserver.crt
+rm webserver.csr
 
 # Sign backoffice certificate
 
 openssl x509 -req -days 365 -in backoffice.csr -CA ca.crt -CAkey ca.key -extfile backoffice-domains.ext -set_serial 01 -out backoffice.crt
+rm backoffice.csr
 
 # Sign database certificate
 
 openssl x509 -req -days 365 -in database.csr -CA ca.crt -CAkey ca.key -extfile database-domains.ext -set_serial 01 -out database.crt
+rm database.csr
 
 echo ""
 echo "Done."

@@ -23,7 +23,7 @@ public class BackofficeServiceImpl extends ServerServiceGrpc.ServerServiceImplBa
 	public void register(RegisterRequest request, StreamObserver<AckResponse> responseObserver) {
 		AckResponse.Builder builder = AckResponse.newBuilder();
 		try {
-			server.register(request.getUsername(), request.getPassword());
+			server.register(request.getUsername(), request.getPassword(), request.getRole().name());
 
 			builder.setAck(true);
 
@@ -40,9 +40,10 @@ public class BackofficeServiceImpl extends ServerServiceGrpc.ServerServiceImplBa
 	public void login(LoginRequest request, StreamObserver<LoginResponse> responseObserver) {
 		LoginResponse.Builder builder = LoginResponse.newBuilder();
 		try {
-			String hashedToken = server.login(request.getUsername(), request.getPassword());
+			List<String> response = server.login(request.getUsername(), request.getPassword());
 
-			builder.setHashedToken(hashedToken);
+			builder.setRole(RoleType.valueOf(response.get(0)));
+			builder.setHashedToken(response.get(1));
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
@@ -63,13 +64,13 @@ public class BackofficeServiceImpl extends ServerServiceGrpc.ServerServiceImplBa
 
 			builder.setAck(ack);
 
-			responseObserver.onNext(builder.build());
-			responseObserver.onCompleted();
-		} catch (SQLException e){
-			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (RuntimeException | AdminDoesNotExistException | InvalidSessionTokenException | LogoutException e) {
-			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		} catch (SQLException | RuntimeException | AdminDoesNotExistException | InvalidSessionTokenException e) {
+			// do nothing, admin should be able to log out
+			builder.setAck(true);
 		}
+
+		responseObserver.onNext(builder.build());
+		responseObserver.onCompleted();
 	}
 
 	@Override
@@ -87,6 +88,40 @@ public class BackofficeServiceImpl extends ServerServiceGrpc.ServerServiceImplBa
 		} catch (AdminDoesNotExistException e) {
 			responseObserver.onError(Status.ALREADY_EXISTS.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidSessionTokenException e) {
+			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		}
+	}
+
+	@Override
+	public void checkPersonalInfo(CheckPersonalInfoRequest request, StreamObserver<CheckPersonalInfoResponse> responseObserver) {
+		CheckPersonalInfoResponse.Builder builder = CheckPersonalInfoResponse.newBuilder();
+		try {
+			PersonalInfo personalInfo = server.checkPersonalInfo(request.getUsername(), request.getEmail(), request.getHashedToken());
+
+			builder.setPersonalInfo(personalInfo);
+
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (SQLException e){
+			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+		} catch (AdminDoesNotExistException | InvalidSessionTokenException | ClientDoesNotExistException e){
+			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		}
+	}
+
+	@Override
+	public void checkEnergyPanel(CheckEnergyPanelRequest request, StreamObserver<CheckEnergyPanelResponse> responseObserver) {
+		CheckEnergyPanelResponse.Builder builder = CheckEnergyPanelResponse.newBuilder();
+		try {
+			EnergyPanel energyPanel = server.checkEnergyPanel(request.getUsername(), request.getEmail(), request.getHashedToken());
+
+			builder.setEnergyPanel(energyPanel);
+
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (SQLException e){
+			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+		} catch (AdminDoesNotExistException | InvalidSessionTokenException | ClientDoesNotExistException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}

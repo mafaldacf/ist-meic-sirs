@@ -2,34 +2,43 @@ package pt.ulisboa.tecnico.sirs.webserver;
 
 import pt.ulisboa.tecnico.sirs.crypto.Crypto;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
+import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
 
 public class Webserver {
     private final Connection dbConnection;
+    private final int MAX_ENERGY_CONSUMPTION = 100;
+    private final int MAX_ENERGY_PRODUCTION = 100;
+
+    private static List<String> months = new ArrayList<>(Arrays.asList
+            ("Jan", "Feb", "Mar", "Apr", "Mai", "Jun", "Jul", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"));
 
     public Webserver(Connection dbConnection) {
         this.dbConnection = dbConnection;
     }
 
-    public String setClientSession(String email)
-            throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, SQLException {
+    /*
+    ------------------------------------------------------
+    ---------------- CLIENT SESSION TOKEN ----------------
+    ------------------------------------------------------
+     */
 
-        String query;
+    public String setClientSession(String email) throws NoSuchAlgorithmException, SQLException {
         PreparedStatement st;
 
         String token = Crypto.generateToken();
         String hashedToken = Crypto.hash(token);
 
-        query = UPDATE_CLIENT_TOKEN;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(UPDATE_CLIENT_TOKEN);
         st.setString(1, hashedToken);
         st.setString(2, email);
         st.executeUpdate();
@@ -40,13 +49,10 @@ public class Webserver {
 
     public void validateSession(String email, String hashedToken)
             throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
-
-        String query;
         PreparedStatement st;
         ResultSet rs;
 
-        query = READ_CLIENT_COUNT;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(READ_CLIENT_COUNT);
         st.setString(1, email);
         rs = st.executeQuery();
 
@@ -55,8 +61,7 @@ public class Webserver {
         }
         st.close();
 
-        query = READ_CLIENT_TOKEN;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(READ_CLIENT_TOKEN);
         st.setString(1, email);
         rs = st.executeQuery();
 
@@ -68,14 +73,18 @@ public class Webserver {
         st.close();
     }
 
-    public void register(String email, String password, String address, String plan) throws SQLException, ClientAlreadyExistsException {
-        String query;
+    /*
+    ------------------------------------------------------
+    --------------- CLIENT FUNCTIONALITIES ---------------
+    ------------------------------------------------------
+     */
+
+    public void register(String name, String email, String password, String address, String iban, String plan) throws SQLException, ClientAlreadyExistsException, NoSuchAlgorithmException {
         PreparedStatement st;
         ResultSet rs;
 
         // check if email is already registered
-        query = READ_CLIENT_COUNT;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(READ_CLIENT_COUNT);
         st.setString(1, email);
 
         rs = st.executeQuery();
@@ -86,102 +95,182 @@ public class Webserver {
 
         st.close();
 
-        // register client
-        float energyConsumedPerMonth = (float)(Math.random()*300);
-        float energyConsumedPerHour = energyConsumedPerMonth/700;
+        // create client
 
-        query = CREATE_CLIENT;
-        st = dbConnection.prepareStatement(query);
-        st.setString(1, email);
-        st.setString(2, password);
+        byte[] salt = Crypto.generateSalt();
+        String hashedPassword = Crypto.hashWithSalt(password, salt);
+
+        st = dbConnection.prepareStatement(CREATE_CLIENT);
+        st.setString(1, name);
+        st.setString(2, email);
         st.setString(3, address);
-        st.setString(4, plan);
-        st.setFloat(5, energyConsumedPerMonth);
-        st.setFloat(6, energyConsumedPerHour);
-
+        st.setString(4, hashedPassword);
+        st.setString(5, iban);
+        st.setString(6, plan);
+        st.setBytes(7, salt);
         st.executeUpdate();
-
-
         st.close();
     }
 
-    public String login(String email, String password)
+    public ArrayList<String> login(String email, String password)
             throws ClientDoesNotExistException, SQLException,
             WrongPasswordException, NoSuchAlgorithmException, SignatureException, InvalidKeyException {
 
-        String query;
         PreparedStatement st;
         ResultSet rs;
+        String name;
+        ArrayList<String> response = new ArrayList<>();
 
-        query = READ_CLIENT;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(READ_CLIENT_NAME_PASSWORD_SALT);
         st.setString(1, email);
 
         rs = st.executeQuery();
 
         if (rs.next()) {
-            String dbPassword = rs.getString(3);
-            if (!password.equals(dbPassword)) {
+            name = rs.getString(1);
+            String dbHashedPassword = rs.getString(2);
+            byte[] salt = rs.getBytes(3);
+            String hashedPassword = Crypto.hashWithSalt(password, salt);
+            if (!hashedPassword.equals(dbHashedPassword)) {
+                st.close();
                 throw new WrongPasswordException();
             }
         }
         else {
+            st.close();
             throw new ClientDoesNotExistException(email);
         }
         st.close();
 
         String hashedToken = setClientSession(email);
+        response.add(name);
+        response.add(hashedToken);
 
-        return hashedToken;
+        return response;
     }
 
-    public boolean logout(String email, String hashedToken)
-            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException, LogoutException {
-
-        String query;
+    public void logout(String email, String hashedToken)
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
         PreparedStatement st;
 
         validateSession(email, hashedToken);
 
-        query = UPDATE_CLIENT_TOKEN;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(UPDATE_CLIENT_TOKEN);
         st.setString(1, "");
         st.setString(2, email);
 
-        int result = st.executeUpdate();
-
-        if (result == 0) {
-            throw new LogoutException();
-        }
-
-        return true;
+        st.executeUpdate();
     }
 
-    public List<String> checkPersonalInfo(String clientEmail, String hashedToken)
-            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException {
+    public void addApplicance(String email, String applianceName, String applianceBrand, String hashedToken)
+            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, ApplianceAlreadyExistsException {
 
-        String query;
         PreparedStatement st;
         ResultSet rs;
-        List<String> personalInfo = new ArrayList<>();
+
+        validateSession(email, hashedToken);
+
+        int client_id = getClientId(email);
+
+        // check if appliance is already registered
+        st = dbConnection.prepareStatement(READ_APPLIANCE_COUNT);
+        st.setInt(1, client_id);
+        st.setString(2, applianceName);
+        st.setString(3, applianceBrand);
+
+        rs = st.executeQuery();
+
+        if (rs.next() && rs.getInt(1) != 0){
+            throw new ApplianceAlreadyExistsException(applianceName, applianceBrand);
+        }
+
+        st.close();
+
+        // generate random energy consumed
+        float energyConsumedDaytime = (float)(Math.random()*MAX_ENERGY_CONSUMPTION);
+        float energyConsumedNight = (float)(Math.random()*MAX_ENERGY_CONSUMPTION);
+        float energyConsumed = energyConsumedDaytime + energyConsumedNight;
+
+        // add appliance
+        st = dbConnection.prepareStatement(CREATE_APPLIANCE);
+        st.setInt(1, getClientId(email));
+        st.setString(2, applianceName);
+        st.setString(3, applianceBrand);
+        st.setFloat(4, energyConsumed);
+        st.setFloat(5, energyConsumedDaytime);
+        st.setFloat(6, energyConsumedNight);
+        st.executeUpdate();
+        st.close();
+
+        updateEnergyConsumption(email, energyConsumed, energyConsumedDaytime, energyConsumedNight);
+    }
+
+    public void addSolarPanel(String email, String solarPanelName, String solarPanelBrand, String hashedToken)
+            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, SolarPanelAlreadyExistsException {
+        PreparedStatement st;
+        ResultSet rs;
+
+        validateSession(email, hashedToken);
+
+        int client_id = getClientId(email);
+
+        // check if solar panel is already registered
+        st = dbConnection.prepareStatement(READ_SOLAR_PANEL_COUNT);
+        st.setInt(1, client_id);
+        st.setString(2, solarPanelName);
+        st.setString(3, solarPanelBrand);
+
+        rs = st.executeQuery();
+
+        if (rs.next() && rs.getInt(1) != 0){
+            throw new SolarPanelAlreadyExistsException(solarPanelName, solarPanelBrand);
+        }
+
+        // generate random energy produced
+        float energyProduced = (float)(Math.random()*MAX_ENERGY_PRODUCTION);
+
+        // add solar panel
+        st = dbConnection.prepareStatement(CREATE_SOLAR_PANEL);
+        st.setInt(1, client_id);
+        st.setString(2, solarPanelName);
+        st.setString(3, solarPanelBrand);
+        st.setFloat(4, energyProduced);
+        st.executeUpdate();
+        st.close();
+
+        updateEnergyProduction(email, energyProduced);
+    }
+
+    public PersonalInfo checkPersonalInfo(String clientEmail, String hashedToken)
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException {
+        PersonalInfo personalInfo;
+        PreparedStatement st;
+        ResultSet rs;
 
         validateSession(clientEmail, hashedToken);
 
         // get personal info
-        query = READ_CLIENT_PERSONAL_INFO;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
         st.setString(1, clientEmail);
         rs = st.executeQuery();
 
         if (rs.next()) {
-            String email = rs.getString(1);
-            String address = rs.getString(2);
-            String plan = rs.getString(3);
-            personalInfo.add(email);
-            personalInfo.add(address);
-            personalInfo.add(plan);
+            String name = rs.getString(1);
+            String email = rs.getString(2);
+            String address = rs.getString(3);
+            String iban = rs.getString(4);
+            String plan = rs.getString(5);
+
+            personalInfo = PersonalInfo.newBuilder()
+                    .setName(name)
+                    .setEmail(email)
+                    .setAddress(address)
+                    .setIBAN(iban)
+                    .setPlan(PlanType.valueOf(plan))
+                    .build();
         }
         else {
+            st.close();
             throw new ClientDoesNotExistException(clientEmail);
         }
 
@@ -190,48 +279,98 @@ public class Webserver {
         return personalInfo;
     }
 
-    public List<Float> checkEnergyConsumption(String email, String hashedToken)
+    public EnergyPanel checkEnergyPanel(String email, String hashedToken)
             throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException {
-
-        String query;
+        EnergyPanel energyPanel;
+        List<Appliance> appliances;
+        List<SolarPanel> solarPanels;
         PreparedStatement st;
         ResultSet rs;
-        List<Float> energyConsumption = new ArrayList<>();
 
         validateSession(email, hashedToken);
+        int client_id = getClientId(email);
 
-        // get energy consumption
-        query = READ_CLIENT_ENERGY_CONSUMPTION;
-        st = dbConnection.prepareStatement(query);
+        appliances = getAppliances(client_id);
+        solarPanels = getSolarPanels(client_id);
+
+        st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION_PRODUCTION);
         st.setString(1, email);
         rs = st.executeQuery();
 
         if (rs.next()) {
-            Float energyConsumedPerMonth = rs.getFloat(1);
-            Float energyConsumedPerHour = rs.getFloat(2);
-            energyConsumption.add(energyConsumedPerMonth);
-            energyConsumption.add(energyConsumedPerHour);
+            float energyConsumed = rs.getFloat(1);
+            float energyConsumedDaytime = rs.getFloat(2);
+            float energyConsumedNight = rs.getFloat(3);
+            float energyProduced = rs.getFloat(4);
+
+            energyPanel = EnergyPanel.newBuilder()
+                    .setEnergyConsumed(energyConsumed)
+                    .setEnergyConsumedDaytime(energyConsumedDaytime)
+                    .setEnergyConsumedNight(energyConsumedNight)
+                    .setEnergyProduced(energyProduced)
+                    .addAllAppliances(appliances)
+                    .addAllSolarPanels(solarPanels)
+                    .build();
         }
         else {
+            st.close();
             throw new ClientDoesNotExistException(email);
         }
 
         st.close();
 
-        return energyConsumption;
+        return energyPanel;
+    }
+
+    public List<Invoice> checkInvoices(String email, String hashedToken)
+            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException {
+        PreparedStatement st;
+        ResultSet rs;
+        List<Invoice> invoices = new ArrayList<>();
+
+        validateSession(email, hashedToken);
+        int client_id = getClientId(email);
+
+        st = dbConnection.prepareStatement(READ_INVOICES);
+        st.setInt(1, client_id);
+        rs = st.executeQuery();
+
+        while (rs.next()) {
+            int year = rs.getInt(1);
+            int month = rs.getInt(2);
+            float paymentAmount = rs.getFloat(3);
+            float energyConsumed = rs.getFloat(4);
+            float energyConsumedDaytime = rs.getFloat(5);
+            float energyConsumedNight = rs.getFloat(6);
+            String plan = rs.getString(7);
+            int taxes = rs.getInt(8);
+
+            Invoice invoice = Invoice.newBuilder()
+                    .setYear(year)
+                    .setMonth(months.get(month))
+                    .setPaymentAmount(paymentAmount)
+                    .setEnergyConsumed(energyConsumed)
+                    .setEnergyConsumedDaytime(energyConsumedDaytime)
+                    .setEnergyConsumedNight(energyConsumedNight)
+                    .setPlan(PlanType.valueOf(plan))
+                    .setTaxes(taxes)
+                    .build();
+            invoices.add(invoice);
+        }
+
+        st.close();
+
+        return invoices;
     }
 
     public void updateAddress(String email, String address, String hashedToken)
             throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
-
-        String query;
         PreparedStatement st;
 
         validateSession(email, hashedToken);
 
         // update address
-        query = UPDATE_CLIENT_ADDRESS;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(UPDATE_CLIENT_ADDRESS);
         st.setString(1, address);
         st.setString(2, email);
         st.executeUpdate();
@@ -241,18 +380,157 @@ public class Webserver {
     public void updatePlan(String email, String plan, String hashedToken)
             throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
 
-        String query;
-        PreparedStatement st;
-
         validateSession(email, hashedToken);
 
         // update plan
-        query = UPDATE_CLIENT_PLAN;
-        st = dbConnection.prepareStatement(query);
+        PreparedStatement st = dbConnection.prepareStatement(UPDATE_CLIENT_PLAN);
         st.setString(1, plan);
         st.setString(2, email);
         st.executeUpdate();
         st.close();
+    }
+
+    /*
+    ------------------------------------------------------
+    ---------------- AUXILIARY FUNCTIONS -----------------
+    ------------------------------------------------------
+     */
+
+    public int getClientId(String email) throws SQLException, ClientDoesNotExistException {
+        PreparedStatement st;
+        ResultSet rs;
+        int client_id;
+
+        // get client id
+        st = dbConnection.prepareStatement(READ_CLIENT_ID);
+        st.setString(1, email);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            client_id = rs.getInt(1);
+        }
+        else {
+            st.close();
+            throw new ClientDoesNotExistException(email);
+        }
+        st.close();
+
+        return client_id;
+    }
+
+    public void updateEnergyConsumption(String email, float energyConsumed, float energyConsumedDaytime, float energyConsumedNight)
+            throws SQLException, ClientDoesNotExistException {
+        PreparedStatement st;
+        ResultSet rs;
+        float currEnergyConsumed;
+        float currEnergyConsumedDaytime;
+        float currEnergyConsumedNight;
+
+        // get current energy consumption
+        st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION);
+        st.setString(1, email);
+        rs = st.executeQuery();
+        if (rs.next()){
+            currEnergyConsumed = rs.getFloat(1);
+            currEnergyConsumedDaytime = rs.getFloat(2);
+            currEnergyConsumedNight = rs.getFloat(3);
+        }
+        else {
+            throw new ClientDoesNotExistException(email);
+        }
+        st.close();
+
+        // update energy consumption
+        st = dbConnection.prepareStatement(UPDATE_CLIENT_ENERGY_CONSUMPTION);
+        st.setFloat(1, currEnergyConsumed + energyConsumed);
+        st.setFloat(2, currEnergyConsumedDaytime + energyConsumedDaytime);
+        st.setFloat(3, currEnergyConsumedNight + energyConsumedNight);
+        st.setString(4, email);
+        st.executeUpdate();
+        st.close();
+    }
+
+    public void updateEnergyProduction(String email, float energyProduced) throws SQLException, ClientDoesNotExistException {
+        PreparedStatement st;
+        ResultSet rs;
+        float currEnergyProduced;
+
+        // get current energy consumption
+        st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PRODUCTION);
+        st.setString(1, email);
+        rs = st.executeQuery();
+        if (rs.next()){
+            currEnergyProduced = rs.getFloat(1);
+        }
+        else {
+            throw new ClientDoesNotExistException(email);
+        }
+        currEnergyProduced = rs.getFloat(1);
+        st.close();
+
+        // update energy consumption
+        st = dbConnection.prepareStatement(UPDATE_CLIENT_ENERGY_PRODUCTION);
+        st.setFloat(1, currEnergyProduced + energyProduced);
+        st.setString(2, email);
+        st.executeUpdate();
+        st.close();
+    }
+
+    public List<Appliance> getAppliances(int client_id) throws SQLException {
+        PreparedStatement st;
+        ResultSet rs;
+        List<Appliance> appliances = new ArrayList<>();
+
+        st = dbConnection.prepareStatement(READ_APPLIANCES);
+        st.setInt(1, client_id);
+        rs = st.executeQuery();
+
+        while (rs.next()) {
+            String name = rs.getString(1);
+            String brand = rs.getString(2);
+            float energyConsumed = rs.getFloat(3);
+            float energyConsumedDaytime = rs.getFloat(4);
+            float energyConsumedNight = rs.getFloat(5);
+
+            Appliance appliance = Appliance.newBuilder()
+                    .setName(name)
+                    .setBrand(brand)
+                    .setEnergyConsumed(energyConsumed)
+                    .setEnergyConsumedDaytime(energyConsumedDaytime)
+                    .setEnergyConsumedNight(energyConsumedNight)
+                    .build();
+            appliances.add(appliance);
+        }
+        st.close();
+
+        return appliances;
+    }
+
+    public List<SolarPanel> getSolarPanels(int client_id) throws SQLException {
+        PreparedStatement st;
+        ResultSet rs;
+        List<SolarPanel> solarPanels = new ArrayList<>();
+
+        st = dbConnection.prepareStatement(READ_SOLAR_PANELS);
+        st.setInt(1, client_id);
+        rs = st.executeQuery();
+
+
+        while (rs.next()) {
+            String name = rs.getString(1);
+            String brand = rs.getString(2);
+            float energyProduced = rs.getInt(3);
+
+            SolarPanel solarPanel = SolarPanel.newBuilder()
+                    .setName(name)
+                    .setBrand(brand)
+                    .setEnergyProduced(energyProduced)
+                    .build();
+            solarPanels.add(solarPanel);
+        }
+        st.close();
+
+        return solarPanels;
     }
 
 }

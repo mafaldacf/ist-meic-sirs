@@ -10,8 +10,11 @@ service ServerService {
 	rpc register(RegisterRequest) returns (AckResponse);
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);
+	rpc addAppliance(AddEquipmentRequest) returns (AckResponse);
+	rpc addSolarPanel(AddEquipmentRequest) returns (AckResponse);
 	rpc checkPersonalInfo(CheckPersonalInfoRequest) returns (CheckPersonalInfoResponse);
-	rpc checkEnergyConsumption(CheckEnergyConsumptionRequest) returns (CheckEnergyConsumptionResponse);
+	rpc checkEnergyPanel(CheckEnergyPanelRequest) returns (CheckEnergyPanelResponse);
+	rpc checkInvoices(CheckInvoicesRequest) returns (CheckInvoicesResponse);
 	rpc updateAddress(UpdateAddressRequest) returns (AckResponse);
 	rpc updatePlan(UpdatePlanRequest) returns (AckResponse);
 }
@@ -27,10 +30,12 @@ message AckResponse {
 
 // Register
 message RegisterRequest {
-	string email = 1;
-	string password = 2;
-	string address = 3;
-	PlanType plan = 4;
+	string name = 1;
+	string email = 2;
+	string password = 3;
+	string address = 4;
+	string IBAN = 5;
+	PlanType plan = 6;
 }
 
 // Login
@@ -41,7 +46,8 @@ message LoginRequest {
 }
 
 message LoginResponse {
-	string hashedToken = 1;
+	string name = 1;
+	string hashedToken = 2;
 }
 
 // Logout
@@ -51,7 +57,23 @@ message LogoutRequest {
 	string hashedToken = 2;
 }
 
+// Add appliance or solar panel
+
+message AddEquipmentRequest {
+	string email = 1;
+	string equipmentName = 2;
+	string equipmentBrand = 3;
+	string hashedToken = 4;
+}
 // Check personal info
+
+message PersonalInfo {
+	string name = 1;
+	string email = 2;
+	string address = 3;
+	string IBAN = 4;
+	PlanType plan = 5;
+}
 
 message CheckPersonalInfoRequest {
 	string email = 1;
@@ -59,21 +81,63 @@ message CheckPersonalInfoRequest {
 }
 
 message CheckPersonalInfoResponse {
-	string email = 1;
-	string address = 2;
-	PlanType plan = 3;
+	PersonalInfo personalInfo = 1;
 }
 
-// Check energy consumption
+// Check energy panel
 
-message CheckEnergyConsumptionRequest {
+message EnergyPanel {
+	float energyConsumed = 1;
+	float energyConsumedDaytime = 2;
+	float energyConsumedNight = 3;
+	float energyProduced = 4;
+	repeated Appliance appliances = 5;
+	repeated SolarPanel solarPanels = 6;
+}
+
+message SolarPanel {
+	string name = 1;
+	string brand = 2;
+	float energyProduced = 3;
+}
+
+message Appliance {
+	string name = 1;
+	string brand = 2;
+	float energyConsumed = 3;
+	float energyConsumedDaytime = 4;
+	float energyConsumedNight = 5;
+}
+
+message CheckEnergyPanelRequest {
 	string email = 1;
 	string hashedToken = 2;
 }
 
-message CheckEnergyConsumptionResponse {
-	float energyConsumedPerMonth = 1;
-	float energyConsumedPerHour = 2;
+message CheckEnergyPanelResponse {
+	EnergyPanel energyPanel = 1;
+}
+
+// Check invoices
+
+message Invoice {
+	int32 year = 1;
+	string month = 2;
+	float paymentAmount = 3;
+	float energyConsumed = 4;
+	float energyConsumedDaytime = 5;
+	float energyConsumedNight = 6;
+	PlanType plan = 7;
+	int32 taxes = 8;
+}
+
+message CheckInvoicesRequest {
+	string email = 1;
+	string hashedToken = 2;
+}
+
+message CheckInvoicesResponse {
+	repeated Invoice invoices = 1;
 }
 
 // Update personal address

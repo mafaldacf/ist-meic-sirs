@@ -15,18 +15,18 @@ The EcoGes application concerns a five-tier system:
 - A set of internal machines where employees can access the back office.
 - A database server to store persistent information regarding clients and the organization’s internal data.
 
-## Technology Used
+# Technology Used
 - Java programming language
 - gRPC: framework of remote procedure calls that supports client and server communication
 - Maven: build automation tool for Java projects
 - Protobuf: cross-platform data used to serialize structured data
 - JUnit: unit testing framework for Java programming language
 
-## Requirements
+# Requirements
 
 - Java Developer Kit 19 (JDK 19)
 - Maven 3
-- MySQL ?
+- MySQL
 
 Install:
 
@@ -40,140 +40,174 @@ Confirm all versions are correctly installed:
     mvn -version
     mysql -v
 
-All virtual machines will be running on Linux.
+# Configure Network and Firewall
 
-## Configure network and firewall
-
-TODO
-
-### Firewall
-
-The firewall is a machine set between the external network and the DMZ. It is used as a reverse proxy.
-
-### Webserver
-
-The webserver is a machine in the DMZ.
-
-Example of interface configuration:
-- enp0s3: INTERNET
-- enp0s8: 192.168.1.0/24
-- enp0s9: 192.168.2.0/24
+All machines will be running on Linux and configured according to the following figure and table:
 
 
-### Backoffice
+<img src="network_architecture.png" alt="Machines and Network Architecture" style="height: 500px; width: 600px;"/>
 
-The backoffice is a machine in the internal network.
 
-### Database
 
-The backoffice is a machine in the internal network.
+| # Interface | Subnet | Adapter | Adapter Attached To | Adapter Name |
+|:---:|:---:|:---:|:---:|:---:|
+| __Client Machine__ |||||||||
+| 1 | INTERNET (10.0.2.6) | enp0s3 | NatNetwork |  |
+| __Firewall Machine__ |
+| 1 | INTERNET (10.0.2.4) | enp0s3 | NatNetwork |  |
+| 2 | 192.168.0.1 | enp0s3 | Internal Network | sw-0
+| 3 | 192.168.1.1 | enp0s8 | Internal Network | sw-1
+| 4 | 192.168.2.1 | enp0s9 | Internal Network | sw-2
+| __Webserver Machine__ |
+| 1 | 192.168.0.2 | enp0s3 | Internal Network | sw-0
+| __Database Machine__ |
+| 1 | 192.168.1.2 | enp0s3 | Internal Network | sw-1
+| __Backoffice Machine__ |
+| 1 | 192.168.2.2 | enp0s3 | Internal Network | sw-2
+| __Admin Machine__ |
+| 1 | 192.168.2.2 | enp0s3 | Internal Network | sw-2
 
-Example of interface configuration:
-- enp0s3: INTERNET
-- enp0s8: 192.168.2.1/24
 
-### Admin
 
-An admin is a machine in the internal network that sends requests to the backoffice.
 
-### Client
+For each machine, run the following commands:
 
-A client is a machine in the external network that sends requests to the webserver.
+    cd ecoges/network_configuration
 
-Example of interface configuration:
-- enp0s3: INTERNET
-- enp0s8: 192.168.1.1/24
+Firewall machine:
+    
+    chmod 777 firewall.sh
+    sudo ./firewall.sh
 
-## Generate certificates
+Webserver machine:
 
-Before deploying all machines, both webserver and backoffice ceritifcate need to be issued to their IP address in the `IP.1` field in `ecoges/keyscerts/webserver-domains.ext` and `ecoges/keyscerts/backoffice-domains.ext`, respectivelly. (e.g. webserver: `192.168.1.0`, backoffice: `192.168.2.0`, database:`192.168.2.1`). The content of both files correspond to the following:
+    chmod 777 webserver.sh
+    sudo ./webserver.sh
 
-    authorityKeyIdentifier=keyid,issuer
-    basicConstraints=CA:FALSE
-    keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
-    subjectAltName = @alt_names
-    [alt_names]
-    DNS.1 = localhost
-    IP.1 = <IP address>
+Backoffice machine:
+
+    chmod 777 backoffice.sh
+    sudo ./backoffice.sh
+
+Database machine:
+
+    chmod 777 db.sh
+    sudo ./db.sh
+
+Admin machine:
+
+    chmod 777 admin-terminal.sh
+    sudo ./terminal.sh
+
+# Generate Certificates
+
+Before deploying all machines, both webserver, backoffice and database ceritificates need to be issued to their IP address.
+
+Change the field `IP.1` in `ecoges/tlscerts/webserver-domains.ext` to the corresponding IP address (e.g. Firewall public IP `10.0.2.4`)
+ 
+    IP.1 = 10.0.2.4
+
+Change the field `IP.1` in `ecoges/tlscerts/backoffice-domains.ext` to the corresponding IP address (e.g. `192.168.2.2`)
+
+    IP.1 = 192.168.2.2
+
+Change the field `IP.1` in `ecoges/tlscerts/database-domains.ext` to the corresponding IP address (e.g. `192.168.1.2`)
+
+    IP.1 = 192.168.1.2
 
 To generate the certificates, simply run the shell script:
 
-    cd ecoges/keyscerts
+    sudo apt install dos2unix
+    cd ecoges/tlscerts
+    dos2unix ./script.sh
     ./script.sh
 
-## Set up database
+# Set Up Database
 
-Grant privileges on users (webserver and backoffice) on `<serverHost>` (for development: `localhost`, otherwise -> e.g. webserver: `192.168.1.0`, backoffice: `192.168.2.0`):
+Add `clientdb` schema:
 
     sudo mysql
+        DROP DATABASE IF EXISTS clientdb;
         CREATE DATABASE clientdb;
 
-        CREATE USER 'ecoges'@'<webserverHost>' IDENTIFIED BY 'admin';
-        GRANT ALL PRIVILEGES ON clientdb.* TO 'ecoges'@'<webserverHost>';
+Add symmetric encryption mechanism:
 
-        CREATE USER 'ecoges'@'<backofficeHost>' IDENTIFIED BY 'admin';
-        GRANT ALL PRIVILEGES ON clientdb.* TO 'ecoges'@'<backofficeHost>';
+        install plugin keyring_file soname 'keyring_file.so';
+        show variables like '%keyring%';
 
-Change `bind-address` field to desired `<databaseHost>` of database (e.g. `192.168.2.1`):
+Later, when the system is running, we can verify that the database tables are encrypted using:
 
+        SELECT TABLE_SCHEMA, TABLE_NAME, CREATE_OPTIONS FROM INFORMATION_SCHEMA.TABLES WHERE CREATE_OPTIONS LIKE '%ENCRYPTION%';
+
+
+Note that the master encryption key should be rotated periodically and whenever you suspect that the key has been compromised using:
+
+        ALTER INSTANCE ROTATE INNODB MASTER KEY;
+
+Create an user for webserver and backoffice with hosts `192.168.0.2` and `192.168.2.2`, respectively (alternatively, can use `localhost` during development) and add privileges:
+
+        CREATE USER 'ecoges'@'192.168.0.2' IDENTIFIED BY 'admin';
+        GRANT ALL PRIVILEGES ON clientdb.* TO 'ecoges'@'192.168.0.2';
+
+        CREATE USER 'ecoges'@'192.168.2.2' IDENTIFIED BY 'admin';
+        GRANT ALL PRIVILEGES ON clientdb.* TO 'ecoges'@'192.168.2.2';
+
+Change `bind-address` field to desired `<databaseHost>` of database (e.g. `192.168.1.2`):
+
+    exit
     sudo vim /etc/mysql/mysql.conf.d/mysqld.cnf
-        bind-address = <databaseHost>
+        bind-address = 192.168.1.2
 
-Copy keys and certificates:
 
-    cd ecoges
-    sudo cp -r keyscerts /etc/mysql
+To configure TLS, copy keys and certificates:
 
-Configure Mutual TLS on database by adding the following content:
+    cd SIRS/ecoges
+    sudo mkdir /etc/mysql/tlscerts
+    sudo cp tlscerts/ca.crt /etc/mysql/tlscerts/ca.crt
+    sudo cp tlscerts/database.crt /etc/mysql/tlscerts/database.crt
+    sudo cp tlscerts/database.key /etc/mysql/tlscerts/database.key
+
+Append the following content to `/etc/mysql/my.cnf` file:
 
     sudo vim /etc/mysql/my.cnf
         [mysqld]
         ssl=1
         ssl-cipher=DHE-RSA-AES256-SHA
-        ssl-ca=/etc/mysql/keyscerts/ca.crt
-        ssl-cert=/etc/mysql/keyscerts/database.crt
-        ssl-key=/etc/mysql/keyscerts/database.key
-
-        [client]
-        ssl-mode=REQUIRED
-        ssl-cert=/etc/mysql/keyscerts/webserver.crt
-        ssl-key=/etc/mysql/keyscerts/webserver.key
-
-        [client]
-        ssl-mode=REQUIRED
-        ssl-cert=/etc/mysql/keyscerts/backoffice.crt
-        ssl-key=/etc/mysql/keyscerts/backoffice.key
+        ssl-ca=/etc/mysql/tlscerts/ca.crt
+        ssl-cert=/etc/mysql/tlscerts/database.crt
+        ssl-key=/etc/mysql/tlscerts/database.key
 
 Verify if everything is ok, having the following field values: `have_openssl` = `YES`:
 
     sudo service mysql restart
     sudo mysql
         show variables like '%ssl%';
+    exit
 
 
-## Compile and Run
+# Compile and Run
 
 For each machine, compile and run the project:
 
     cd ecoges
     mvn clean compile install -DskipTests
 
-Run webserver on port `<serverPort>` (e.g. `8000`) and communicate with database on `<databaseHost>` (e.g. `192.168.2.1`) with port `<databasePort>` (e.g. `3306`):
+Run webserver on port `<serverPort>` (e.g. `8000`) and communicate with database on `<databaseHost>` (e.g. `localhost` for development or `192.168.1.2`) with port `<databasePort>` (e.g. `3306`):
 
     cd ecoges/webserver
-    mvn exec:java -Dexec.args="<serverPort> <databaseHost> <serverPort>"
+    mvn exec:java -Dexec.args="8000 192.168.1.2 3306"
 
-Run client to communicate with webserver on `<serverHost>` (e.g. `localhost` for development; `192.168.1.0`) and port `<serverPort>` (e.g. `8000`):
+Run client to communicate with webserver on `<serverHost>` (e.g. `localhost` for development; firewall public IP `10.0.2.4`) and port `<serverPort>` (e.g. `8000`):
 
     cd ecoges/client
-    mvn exec:java -Dexec.args="<serverHost> <serverPort>"
+    mvn exec:java -Dexec.args="10.0.2.4 8000"
 
-Run backoffice on port `<serverPort>` (e.g. `8001`) and communicate with database on `<databaseHost>` (e.g. `192.168.2.1`) with port `<databasePort>` (e.g. `3306`):
+Run backoffice on port `<serverPort>` (e.g. `8001`) and communicate with database on `<databaseHost>` (e.g. `localhost` for development or `192.168.1.2`) with port `<databasePort>` (e.g. `3306`):
 
     cd ecoges/backoffice
-     mvn exec:java -Dexec.args="<serverPort> <databaseHost> <serverPort>"
+    mvn exec:java -Dexec.args="8000 192.168.1.2 3306"
 
-Run admin to communicate with backoffice on `<serverHost>` (e.g. `localhost` for development; `192.168.2.0`) and port `<serverPort>` (e.g. `8001`):
+Run admin to communicate with backoffice on `<serverHost>` (e.g. `localhost` for development; `192.168.2.2`) and port `<serverPort>` (e.g. `8001`):
 
     cd ecoges/admin
-    mvn exec:java -Dexec.args="<serverHost> <serverPort>"
+    mvn exec:java -Dexec.args="192.168.2.2 8001"

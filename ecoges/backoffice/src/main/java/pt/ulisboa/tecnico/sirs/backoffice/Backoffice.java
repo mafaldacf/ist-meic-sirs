@@ -1,8 +1,7 @@
 package pt.ulisboa.tecnico.sirs.backoffice;
 
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.*;
-import pt.ulisboa.tecnico.sirs.backoffice.grpc.Client;
-import pt.ulisboa.tecnico.sirs.backoffice.grpc.PlanType;
+import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
 import pt.ulisboa.tecnico.sirs.crypto.Crypto;
 
 import java.security.InvalidKeyException;
@@ -22,17 +21,14 @@ public class Backoffice {
         this.dbConnection = dbConnection;
     }
 
-    public String setAdminSession(String username)
-            throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, SQLException {
+    public String setAdminSession(String username) throws NoSuchAlgorithmException, SQLException {
 
-        String query;
         PreparedStatement st;
 
         String token = Crypto.generateToken();
         String hashedToken = Crypto.hash(token);
 
-        query = UPDATE_ADMIN_TOKEN;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(UPDATE_ADMIN_TOKEN);
         st.setString(1, hashedToken);
         st.setString(2, username);
         st.executeUpdate();
@@ -44,12 +40,10 @@ public class Backoffice {
     public void validateSession(String username, String hashedToken)
             throws SQLException, AdminDoesNotExistException, InvalidSessionTokenException {
 
-        String query;
         PreparedStatement st;
         ResultSet rs;
 
-        query = READ_ADMIN_COUNT;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(READ_ADMIN_COUNT);
         st.setString(1, username);
         rs = st.executeQuery();
 
@@ -58,8 +52,7 @@ public class Backoffice {
         }
         st.close();
 
-        query = READ_ADMIN_TOKEN;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(READ_ADMIN_TOKEN);
         st.setString(1, username);
         rs = st.executeQuery();
 
@@ -71,16 +64,14 @@ public class Backoffice {
         st.close();
     }
 
-    public void register(String username, String password)
+    public void register(String username, String password, String role)
             throws SQLException, AdminAlreadyExistsException {
 
-        String query;
         PreparedStatement st;
         ResultSet rs;
 
         // check if username is already registered
-        query = READ_ADMIN_COUNT;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(READ_ADMIN_COUNT);
         st.setString(1, username);
 
         rs = st.executeQuery();
@@ -92,11 +83,11 @@ public class Backoffice {
         st.close();
 
         // register username
-        query = CREATE_ADMIN;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(CREATE_ADMIN);
 
         st.setString(1, username);
         st.setString(2, password);
+        st.setString(3, role);
 
         st.executeUpdate();
 
@@ -104,25 +95,25 @@ public class Backoffice {
         st.close();
     }
 
-    public String login(String username, String password)
+    public List<String> login(String username, String password)
             throws AdminDoesNotExistException, SQLException, WrongPasswordException,
             NoSuchAlgorithmException, SignatureException, InvalidKeyException {
-
-        String query;
+        List<String> response = new ArrayList<>();
         PreparedStatement st;
         ResultSet rs;
+        String role;
 
-        query = READ_ADMIN;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(READ_ADMIN_PASSWORD_ROLE);
         st.setString(1, username);
 
         rs = st.executeQuery();
 
         if (rs.next()) {
-            String dbPassword = rs.getString(3);
+            String dbPassword = rs.getString(1);
             if (!password.equals(dbPassword)) {
                 throw new WrongPasswordException();
             }
+            role = rs.getString(2);
         }
         else {
             throw new AdminDoesNotExistException(username);
@@ -130,35 +121,29 @@ public class Backoffice {
         st.close();
 
         String hashedToken = setAdminSession(username);
-        return hashedToken;
+        response.add(role);
+        response.add(hashedToken);
+        return response;
     }
 
     public boolean logout(String username, String hashedToken)
-            throws SQLException, AdminDoesNotExistException, InvalidSessionTokenException, LogoutException {
+            throws SQLException, AdminDoesNotExistException, InvalidSessionTokenException {
 
-        String query;
         PreparedStatement st;
 
         validateSession(username, hashedToken);
 
-        query = UPDATE_ADMIN_TOKEN;
-        st = dbConnection.prepareStatement(query);
+        st = dbConnection.prepareStatement(UPDATE_ADMIN_TOKEN);
         st.setString(1, "");
         st.setString(2, username);
 
         int result = st.executeUpdate();
-
-        if (result == 0) {
-            throw new LogoutException();
-        }
 
         return true;
     }
 
     public List<Client> listClients(String username, String hashedToken)
             throws SQLException, AdminDoesNotExistException, InvalidSessionTokenException {
-
-        String query;
         Statement st;
         ResultSet rs;
 
@@ -166,23 +151,16 @@ public class Backoffice {
 
         validateSession(username, hashedToken);
 
-        query = READ_ALL_CLIENTS_INFO;
         st = dbConnection.createStatement();
-        rs = st.executeQuery(query);
+        rs = st.executeQuery(READ_ALL_CLIENTS_NAME_EMAIL);
 
         while(rs.next()) {
-            String email = rs.getString(1);
-            String address = rs.getString(2);
-            String plan = rs.getString(3);
-            Float energyConsumedPerMonth = rs.getFloat(4);
-            Float energyConsumedPerHour = rs.getFloat(5);
+            String name = rs.getString(1);
+            String email = rs.getString(2);
 
             Client client = Client.newBuilder()
+                    .setName(name)
                     .setEmail(email)
-                    .setAddress(address)
-                    .setPlanType(PlanType.valueOf(plan))
-                    .setEnergyConsumedPerMonth(energyConsumedPerMonth)
-                    .setEnergyConsumedPerHour(energyConsumedPerHour)
                     .build();
 
             clients.add(client);
@@ -192,16 +170,96 @@ public class Backoffice {
         return clients;
     }
 
+    public PersonalInfo checkPersonalInfo(String username, String email, String hashedToken)
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException {
+        PersonalInfo personalInfo;
+        PreparedStatement st;
+        ResultSet rs;
+
+        validateSession(username, hashedToken);
+
+        // get personal info
+        st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
+        st.setString(1, email);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            String name = rs.getString(1);
+            email = rs.getString(2);
+            String address = rs.getString(3);
+            String iban = rs.getString(4);
+            String plan = rs.getString(5);
+
+            personalInfo = PersonalInfo.newBuilder()
+                    .setName(name)
+                    .setEmail(email)
+                    .setAddress(address)
+                    .setIBAN(iban)
+                    .setPlan(PlanType.valueOf(plan))
+                    .build();
+        }
+        else {
+            st.close();
+            throw new ClientDoesNotExistException(email);
+        }
+
+        st.close();
+
+        return personalInfo;
+    }
+
+    public EnergyPanel checkEnergyPanel(String username, String email, String hashedToken)
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException {
+        EnergyPanel energyPanel;
+        List<Appliance> appliances;
+        List<SolarPanel> solarPanels;
+        PreparedStatement st;
+        ResultSet rs;
+
+        validateSession(username, hashedToken);
+        int client_id = getClientId(email);
+
+        appliances = getAppliances(client_id);
+        solarPanels = getSolarPanels(client_id);
+
+        st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION_PRODUCTION);
+        st.setString(1, email);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            float energyConsumed = rs.getFloat(1);
+            float energyConsumedDaytime = rs.getFloat(2);
+            float energyConsumedNight = rs.getFloat(3);
+            float energyProduced = rs.getFloat(4);
+
+            energyPanel = EnergyPanel.newBuilder()
+                    .setEnergyConsumed(energyConsumed)
+                    .setEnergyConsumedDaytime(energyConsumedDaytime)
+                    .setEnergyConsumedNight(energyConsumedNight)
+                    .setEnergyProduced(energyProduced)
+                    .addAllAppliances(appliances)
+                    .addAllSolarPanels(solarPanels)
+                    .build();
+        }
+        else {
+            st.close();
+            throw new ClientDoesNotExistException(email);
+        }
+
+        st.close();
+
+        return energyPanel;
+    }
+
     public boolean deleteClient(String username, String email, String hashedToken)
             throws SQLException, AdminDoesNotExistException, ClientDoesNotExistException, InvalidSessionTokenException {
-
-        String query;
         PreparedStatement st;
 
         validateSession(username, hashedToken);
 
-        query = DELETE_CLIENT;
-        st = dbConnection.prepareStatement(query);
+        int clientId = getClientId(email);
+
+        st = dbConnection.prepareStatement(DELETE_CLIENT);
         st.setString(1, email);
         int success = st.executeUpdate();
         st.close();
@@ -211,6 +269,91 @@ public class Backoffice {
         }
 
         return true;
+    }
+
+    /*
+    ------------------------------------------------------
+    ---------------- AUXILIARY FUNCTIONS -----------------
+    ------------------------------------------------------
+     */
+
+    public int getClientId(String email) throws SQLException, ClientDoesNotExistException {
+        PreparedStatement st;
+        ResultSet rs;
+        int client_id;
+
+        // get client id
+        st = dbConnection.prepareStatement(READ_CLIENT_ID);
+        st.setString(1, email);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            client_id = rs.getInt(1);
+        }
+        else {
+            st.close();
+            throw new ClientDoesNotExistException(email);
+        }
+        st.close();
+
+        return client_id;
+    }
+
+    public List<Appliance> getAppliances(int client_id) throws SQLException {
+        PreparedStatement st;
+        ResultSet rs;
+        List<Appliance> appliances = new ArrayList<>();
+
+        st = dbConnection.prepareStatement(READ_APPLIANCES);
+        st.setInt(1, client_id);
+        rs = st.executeQuery();
+
+        while (rs.next()) {
+            String name = rs.getString(1);
+            String brand = rs.getString(2);
+            float energyConsumed = rs.getFloat(3);
+            float energyConsumedDaytime = rs.getFloat(4);
+            float energyConsumedNight = rs.getFloat(5);
+
+            Appliance appliance = Appliance.newBuilder()
+                    .setName(name)
+                    .setBrand(brand)
+                    .setEnergyConsumed(energyConsumed)
+                    .setEnergyConsumedDaytime(energyConsumedDaytime)
+                    .setEnergyConsumedNight(energyConsumedNight)
+                    .build();
+            appliances.add(appliance);
+        }
+        st.close();
+
+        return appliances;
+    }
+
+    public List<SolarPanel> getSolarPanels(int client_id) throws SQLException {
+        PreparedStatement st;
+        ResultSet rs;
+        List<SolarPanel> solarPanels = new ArrayList<>();
+
+        st = dbConnection.prepareStatement(READ_SOLAR_PANELS);
+        st.setInt(1, client_id);
+        rs = st.executeQuery();
+
+
+        while (rs.next()) {
+            String name = rs.getString(1);
+            String brand = rs.getString(2);
+            float energyProduced = rs.getInt(3);
+
+            SolarPanel solarPanel = SolarPanel.newBuilder()
+                    .setName(name)
+                    .setBrand(brand)
+                    .setEnergyProduced(energyProduced)
+                    .build();
+            solarPanels.add(solarPanel);
+        }
+        st.close();
+
+        return solarPanels;
     }
 
 }

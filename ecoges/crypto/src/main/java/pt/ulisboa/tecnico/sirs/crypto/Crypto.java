@@ -10,25 +10,41 @@ import java.util.Base64;
 
 public class Crypto {
 
-    public static String hash(String message) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+    public static String hash(String message) throws NoSuchAlgorithmException  {
         final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        final byte[] bytes = digest.digest( message.getBytes(StandardCharsets.UTF_8));
+        final byte[] bytes = digest.digest(message.getBytes(StandardCharsets.UTF_8));
         return bytesToHex(bytes);
 
     }
 
-    public static String generateToken() {
-        SecureRandom random = new SecureRandom();
-        byte bytes[] = new byte[20];
+    public static String generateToken() throws NoSuchAlgorithmException {
+        SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+        byte[] bytes = new byte[20];
         random.nextBytes(bytes);
         return java.time.LocalDate.now() + bytesToHex(bytes);
     }
 
+    public static String hashWithSalt(String message, byte[] salt) throws NoSuchAlgorithmException {
+        final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        if (salt != null && salt.length != 0) {
+            digest.update(salt);
+        }
+        final byte[] bytes = digest.digest(message.getBytes(StandardCharsets.UTF_8));
+        return bytesToHex(bytes);
+    }
+
+    public static byte[] generateSalt() throws NoSuchAlgorithmException {
+        SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+        byte[] bytes = new byte[20];
+        random.nextBytes(bytes);
+        return bytes;
+    }
+
     private static String bytesToHex(byte[] bytes) {
         StringBuilder hexString = new StringBuilder(2 * bytes.length);
-        for (int i = 0; i < bytes.length; i++) {
-            String hex = Integer.toHexString(0xff & bytes[i]);
-            if(hex.length() == 1) {
+        for (byte aByte : bytes) {
+            String hex = Integer.toHexString(0xff & aByte);
+            if (hex.length() == 1) {
                 hexString.append('0');
             }
             hexString.append(hex);

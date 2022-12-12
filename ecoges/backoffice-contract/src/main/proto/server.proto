@@ -11,6 +11,8 @@ service ServerService {
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);
 	rpc listClients(ListClientsRequest) returns (ListClientsResponse);
+	rpc checkPersonalInfo(CheckPersonalInfoRequest) returns (CheckPersonalInfoResponse);
+	rpc checkEnergyPanel(CheckEnergyPanelRequest) returns (CheckEnergyPanelResponse);
 	rpc deleteClient(DeleteClientRequest) returns (AckResponse);
 }
 
@@ -19,22 +21,25 @@ enum PlanType {
 	BI_HOURLY_RATE = 1;
 }
 
+enum RoleType {
+	ACCOUNT_MANAGER = 0;
+	ENERGY_SYSTEM_MANAGER = 1;
+}
+
 message AckResponse {
 	bool ack = 1;
 }
 
 message Client {
-	string email = 1;
-	string address = 2;
-	PlanType planType = 3;
-	float energyConsumedPerMonth = 4;
-	float energyConsumedPerHour = 5;
+	string name = 1;
+	string email = 2;
 }
 
 // Register
 message RegisterRequest {
 	string username = 1;
 	string password = 2;
+	RoleType role = 3;
 }
 
 // Login
@@ -44,7 +49,8 @@ message LoginRequest {
 }
 
 message LoginResponse {
-	string hashedToken = 1;
+	RoleType role = 1;
+	string hashedToken = 2;
 }
 
 // Logout
@@ -61,6 +67,61 @@ message ListClientsRequest {
 
 message ListClientsResponse {
 	repeated Client clients = 1;
+}
+
+// Check personal info
+
+message PersonalInfo {
+	string name = 1;
+	string email = 2;
+	string address = 3;
+	string IBAN = 4;
+	PlanType plan = 5;
+}
+
+message CheckPersonalInfoRequest {
+	string username = 1;
+	string email = 2;
+	string hashedToken = 3;
+}
+
+message CheckPersonalInfoResponse {
+	PersonalInfo personalInfo = 1;
+}
+
+// Check energy panel
+
+message EnergyPanel {
+	float energyConsumed = 1;
+	float energyConsumedDaytime = 2;
+	float energyConsumedNight = 3;
+	float energyProduced = 4;
+	repeated Appliance appliances = 5;
+	repeated SolarPanel solarPanels = 6;
+}
+
+message SolarPanel {
+	string name = 1;
+	string brand = 2;
+	float energyProduced = 3;
+}
+
+message Appliance {
+	string name = 1;
+	string brand = 2;
+	float energyConsumed = 3;
+	float energyConsumedDaytime = 4;
+	float energyConsumedNight = 5;
+}
+
+message CheckEnergyPanelRequest {
+	string username = 1;
+	string email = 2;
+	string hashedToken = 3;
+}
+
+message CheckEnergyPanelResponse {
+	EnergyPanel energyPanel = 1;
 }
 
 // Delete client

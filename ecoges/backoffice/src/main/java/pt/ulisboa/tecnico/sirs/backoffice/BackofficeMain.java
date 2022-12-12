@@ -5,10 +5,13 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.*;
 
+import io.grpc.BindableService;
 import io.grpc.Server;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
+
+import static pt.ulisboa.tecnico.sirs.backoffice.DatabaseQueries.*;
 
 public class BackofficeMain {
 	private static InputStream cert;
@@ -43,8 +46,8 @@ public class BackofficeMain {
 		}
 
 		try {
-			cert = Files.newInputStream(Paths.get("../keyscerts/backoffice.crt"));
-			key = Files.newInputStream(Paths.get("../keyscerts/backoffice.pem"));
+			cert = Files.newInputStream(Paths.get("../tlscerts/backoffice.crt"));
+			key = Files.newInputStream(Paths.get("../tlscerts/backoffice.pem"));
 		} catch(IllegalArgumentException | UnsupportedOperationException | IOException e){
 			System.out.println("Could not load server key or certificate.");
 			System.exit(1);
@@ -84,22 +87,14 @@ public class BackofficeMain {
 	}
 
 	private static void setupDatabase() {
-		String query;
 		Statement statement;
 
 		try {
-			query = "DROP TABLE IF EXISTS admin";
 			statement = dbConnection.createStatement();
-			statement.execute(query);
+			statement.execute(DROP_ADMIN_TABLE);
 
-			query = "CREATE TABLE admin (id INTEGER NOT NULL AUTO_INCREMENT, " +
-					"username VARCHAR(25) NOT NULL," +
-					"password VARCHAR(25) NOT NULL," +
-					"token VARCHAR(64) DEFAULT ''," +
-					"UNIQUE (username)," +
-					"PRIMARY KEY (id))";
 			statement = dbConnection.createStatement();
-			statement.execute(query);
+			statement.execute(CREATE_ADMIN_TABLE);
 
 			System.out.println("Database is ready!");
 		} catch (SQLException e) {
