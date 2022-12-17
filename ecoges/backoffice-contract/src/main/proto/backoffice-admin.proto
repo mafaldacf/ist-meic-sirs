@@ -6,7 +6,7 @@ package pt.ulisboa.tecnico.sirs.backoffice.grpc;
 
 option java_multiple_files = true;
 
-service ServerService {
+service BackofficeAdminService {
 	rpc register(RegisterRequest) returns (AckResponse);
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);

@@ -14,14 +14,14 @@ import java.util.List;
 
 public class Admin {
 	private static ManagedChannel channel;
-	private static ServerServiceGrpc.ServerServiceBlockingStub server;
+	private static BackofficeAdminServiceGrpc.BackofficeAdminServiceBlockingStub server;
 
 	public static void init(String host, int port) throws IOException {
 		String target = host + ":" + port;
 		InputStream cert = Files.newInputStream(Paths.get("../tlscerts/backoffice.crt"));
 
 		channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
-		server = ServerServiceGrpc.newBlockingStub(channel);
+		server = BackofficeAdminServiceGrpc.newBlockingStub(channel);
 	}
 
 	public static void close(){

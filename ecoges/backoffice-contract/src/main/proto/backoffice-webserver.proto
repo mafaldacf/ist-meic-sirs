@@ -1,0 +1,20 @@
+//
+// Protocol buffers definition
+//
+syntax = "proto3";
+package pt.ulisboa.tecnico.sirs.backoffice.grpc;
+
+option java_multiple_files = true;
+
+service BackofficeWebserverService {
+  rpc getCompartmentKeys(getCompartmentKeysRequest) returns (getCompartmentKeysResponse);
+}
+
+message getCompartmentKeysRequest {
+
+}
+
+message getCompartmentKeysResponse {
+  string personalInfoKeyString = 1;
+  string energyPanelKeyString = 2;
+}

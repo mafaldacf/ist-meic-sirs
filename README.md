@@ -70,33 +70,30 @@ All machines will be running on Linux and configured according to the following 
 
 
 
-For each machine, run the following commands:
+For each machine, run the following commands (run only **dos2unix** if the script doesn't work as expected):
 
-    cd ecoges/network_configuration
+    cd ecoges/scripts
+    chmod 777 <script>.sh
+    dos2unix ./<script>.sh
 
 Firewall machine:
     
-    chmod 777 firewall.sh
     sudo ./firewall.sh
 
 Webserver machine:
 
-    chmod 777 webserver.sh
     sudo ./webserver.sh
 
 Backoffice machine:
 
-    chmod 777 backoffice.sh
     sudo ./backoffice.sh
 
 Database machine:
 
-    chmod 777 db.sh
     sudo ./db.sh
 
 Admin machine:
 
-    chmod 777 admin-terminal.sh
     sudo ./terminal.sh
 
 # Generate Certificates
@@ -115,11 +112,10 @@ Change the field `IP.1` in `ecoges/tlscerts/database-domains.ext` to the corresp
 
     IP.1 = 192.168.1.2
 
-To generate the certificates, simply run the shell script:
+To generate the certificates, simply run the shell script (run only **dos2unix** if the script doesn't work as expected):
 
-    sudo apt install dos2unix
-    cd ecoges/tlscerts
-    dos2unix ./script.sh
+    cd ecoges/scripts
+    dos2unix ./generateTLSCertificates.sh
     ./script.sh
 
 # Set Up Database
@@ -182,6 +178,13 @@ Verify if everything is ok, having the following field values: `have_openssl` = 
     sudo service mysql restart
     sudo mysql
         show variables like '%ssl%';
+    exit
+
+Generate the database tables using the SQL script:
+
+    cd ecoges/scripts
+    sudo mysql
+        source createDatabaseTables.sql
     exit
 
 

@@ -11,7 +11,6 @@ import io.grpc.Server;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
-import pt.ulisboa.tecnico.sirs.backoffice.exceptions.AdminDoesNotExistException;
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.CompartmentKeyException;
 import pt.ulisboa.tecnico.sirs.crypto.Crypto;
 
@@ -23,7 +22,7 @@ import static pt.ulisboa.tecnico.sirs.backoffice.DatabaseQueries.*;
 
 public class BackofficeMain {
 
-	private static Backoffice server;
+	private static Backoffice backofficeServer;
 
 	// TLS
 	private static InputStream cert;
@@ -89,11 +88,13 @@ public class BackofficeMain {
 			dbConnection = DriverManager.getConnection(DATABASE_URL, DATABASE_USER, DATABASE_PASSWORD);
 			if (dbConnection != null) setupDatabase();
 
-			// Service
-			server = new Backoffice(dbConnection);
-			server.loadCompartmentKeys(keyPair);
-			BackofficeServiceImpl impl = new BackofficeServiceImpl(server);
-			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext).addService(impl).build();
+			// Services
+			backofficeServer = new Backoffice(dbConnection, keyPair);
+			backofficeServer.loadCompartmentKeys();
+			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext)
+					.addService(new BackofficeAdminServiceImpl(backofficeServer))
+					.addService(new BackofficeWebserverServiceImpl(backofficeServer))
+					.build();
 			server.start();
 			System.out.println("Listening on port " + serverPort + "...");
 

@@ -7,16 +7,6 @@ public class DatabaseQueries {
     public static final String DROP_SOLAR_PANEL_TABLE = "DROP TABLE IF EXISTS solarpanel";
     public static final String DROP_INVOICE_TABLE = "DROP TABLE IF EXISTS invoice";
 
-    public static final String DROP_COMPARTMENT_KEYS_TABLE = "DROP TABLE IF EXISTS compartment_keys";
-
-    public static final String CREATE_COMPARTMENT_KEYS_TABLE =
-            "CREATE TABLE compartment_keys (" +
-                    "id INTEGER NOT NULL AUTO_INCREMENT, " +
-                    "personal_info_key BLOB NOT NULL, " +
-                    "energy_panel_key BLOB NOT NULL, " +
-                    "PRIMARY KEY (id))";
-    //"ENGINE=InnoDB ENCRYPTION='Y'";
-
     public static final String CREATE_CLIENT_TABLE =
         "CREATE TABLE client (" +
             "id INTEGER NOT NULL AUTO_INCREMENT, " +

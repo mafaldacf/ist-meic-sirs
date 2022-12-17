@@ -17,9 +17,8 @@ import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
 public class Webserver {
     private final Connection dbConnection;
 
-
-    private String personalInfoKey;
-    private String energyPanelKey;
+    private String personalInfoKeyString;
+    private String energyPanelKeyString;
 
     private final int MAX_ENERGY_CONSUMPTION = 100;
     private final int MAX_ENERGY_PRODUCTION = 100;
@@ -31,35 +30,20 @@ public class Webserver {
         this.dbConnection = dbConnection;
     }
 
-    public void loadCompartmentKeys(KeyPair keyPair) throws SQLException, CompartmentKeyException,
-            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
-
-        PreparedStatement st;
-        byte[] wrappedPersonalInfoKey, wrappedEnergyPanelKey;
-        ResultSet rs;
-
-        st = dbConnection.prepareStatement(READ_COMPARTMENT_KEYS);
-        rs = st.executeQuery();
-
-        if (rs.next()){
-            wrappedPersonalInfoKey = rs.getBytes(1);
-            wrappedEnergyPanelKey = rs.getBytes(2);
-            personalInfoKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedPersonalInfoKey).toString();
-            energyPanelKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedEnergyPanelKey).toString();
-        }
-        else {
-            st.close();
-            throw new CompartmentKeyException();
-        }
-        st.close();
+    public void setPersonalInfoKeyString(String keyString) {
+        personalInfoKeyString = keyString;
     }
 
-    public String getPersonalInfoKey() {
-        return personalInfoKey;
+    public void setEnergyPanelKeyString(String keyString) {
+        energyPanelKeyString = keyString;
     }
 
-    public String getEnergyPanelKey() {
-        return energyPanelKey;
+    public String getPersonalInfoKeyString() {
+        return personalInfoKeyString;
+    }
+
+    public String getEnergyPanelKeyString() {
+        return energyPanelKeyString;
     }
 
     /*
@@ -132,9 +116,6 @@ public class Webserver {
         }
 
         st.close();
-
-        String personalInfoKeyString = getPersonalInfoKey();
-        String energyPanelKeyString = getEnergyPanelKey();
 
         // create client
 
@@ -249,8 +230,6 @@ public class Webserver {
         float energyConsumedNight = (float)(Math.random()*MAX_ENERGY_CONSUMPTION);
         float energyConsumed = energyConsumedDaytime + energyConsumedNight;
 
-        String energyPanelKeyString = getEnergyPanelKey();
-
         // add appliance
         st = dbConnection.prepareStatement(CREATE_APPLIANCE);
         st.setInt(1, getClientId(email));
@@ -295,8 +274,6 @@ public class Webserver {
         // generate random energy produced
         float energyProduced = (float)(Math.random()*MAX_ENERGY_PRODUCTION);
 
-        String energyPanelKeyString = getEnergyPanelKey();
-
         // add solar panel
         st = dbConnection.prepareStatement(CREATE_SOLAR_PANEL);
         st.setInt(1, client_id);
@@ -319,8 +296,6 @@ public class Webserver {
         ResultSet rs;
 
         validateSession(clientEmail, hashedToken);
-
-        String personalInfoKeyString = getPersonalInfoKey();
 
         // get personal info
         st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
@@ -374,8 +349,6 @@ public class Webserver {
 
         appliances = getAppliances(client_id);
         solarPanels = getSolarPanels(client_id);
-
-        String energyPanelKeyString = getEnergyPanelKey();
 
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
         //encrypted compartment: energy panel
@@ -461,8 +434,6 @@ public class Webserver {
 
         validateSession(email, hashedToken);
 
-        String personalInfoKeyString = getPersonalInfoKey();
-
         // update address
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ADDRESS);
         st.setString(1, address);
@@ -477,8 +448,6 @@ public class Webserver {
             IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
 
         validateSession(email, hashedToken);
-
-        String personalInfoKeyString = getPersonalInfoKey();
 
         // update plan
         PreparedStatement st = dbConnection.prepareStatement(UPDATE_CLIENT_PLAN);
@@ -518,16 +487,13 @@ public class Webserver {
     }
 
     public void updateEnergyConsumption(String email, float energyConsumed, float energyConsumedDaytime, float energyConsumedNight)
-            throws SQLException, ClientDoesNotExistException, CompartmentKeyException, IllegalBlockSizeException,
-            NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+            throws SQLException, ClientDoesNotExistException {
 
         PreparedStatement st;
         ResultSet rs;
         float currEnergyConsumed;
         float currEnergyConsumedDaytime;
         float currEnergyConsumedNight;
-
-        String energyPanelKeyString = getEnergyPanelKey();
 
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION);
@@ -560,15 +526,11 @@ public class Webserver {
         st.close();
     }
 
-    public void updateEnergyProduction(String email, float energyProduced) throws SQLException, ClientDoesNotExistException,
-            CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException,
-            InvalidKeyException {
+    public void updateEnergyProduction(String email, float energyProduced) throws SQLException, ClientDoesNotExistException {
 
         PreparedStatement st;
         ResultSet rs;
         float currEnergyProduced;
-
-        String energyPanelKeyString = getEnergyPanelKey();
 
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PRODUCTION);
@@ -593,15 +555,11 @@ public class Webserver {
         st.close();
     }
 
-    public List<Appliance> getAppliances(int clientId)
-            throws SQLException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException,
-            NoSuchAlgorithmException, InvalidKeyException {
+    public List<Appliance> getAppliances(int clientId) throws SQLException {
 
         PreparedStatement st;
         ResultSet rs;
         List<Appliance> appliances = new ArrayList<>();
-
-        String energyPanelKeyString = getEnergyPanelKey();
 
         st = dbConnection.prepareStatement(READ_APPLIANCES);
         st.setString(1, energyPanelKeyString);
@@ -631,14 +589,11 @@ public class Webserver {
         return appliances;
     }
 
-    public List<SolarPanel> getSolarPanels(int clientId) throws SQLException, CompartmentKeyException,
-            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+    public List<SolarPanel> getSolarPanels(int clientId) throws SQLException  {
 
         PreparedStatement st;
         ResultSet rs;
         List<SolarPanel> solarPanels = new ArrayList<>();
-
-        String energyPanelKeyString = getEnergyPanelKey();
 
         st = dbConnection.prepareStatement(READ_SOLAR_PANELS);
         st.setString(1, energyPanelKeyString);

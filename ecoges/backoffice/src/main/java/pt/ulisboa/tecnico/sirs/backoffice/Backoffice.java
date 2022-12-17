@@ -6,10 +6,7 @@ import pt.ulisboa.tecnico.sirs.crypto.Crypto;
 
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import java.security.InvalidKeyException;
-import java.security.KeyPair;
-import java.security.NoSuchAlgorithmException;
-import java.security.SignatureException;
+import java.security.*;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,15 +16,19 @@ import static pt.ulisboa.tecnico.sirs.backoffice.DatabaseQueries.*;
 public class Backoffice {
 
     private final Connection dbConnection;
+    private Key personalInfoKey;
+    private Key energyPanelKey;
+    private String personalInfoKeyString;
+    private String energyPanelKeyString;
 
-    private String personalInfoKey;
-    private String energyPanelKey;
+    private KeyPair keyPair;
 
-    public Backoffice(Connection dbConnection) {
+    public Backoffice(Connection dbConnection, KeyPair keyPair) {
         this.dbConnection = dbConnection;
+        this.keyPair = keyPair;
     }
 
-    public void loadCompartmentKeys(KeyPair keyPair) throws SQLException, CompartmentKeyException,
+    public void loadCompartmentKeys() throws SQLException, CompartmentKeyException,
             IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
 
         PreparedStatement st;
@@ -40,8 +41,10 @@ public class Backoffice {
         if (rs.next()){
             wrappedPersonalInfoKey = rs.getBytes(1);
             wrappedEnergyPanelKey = rs.getBytes(2);
-            personalInfoKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedPersonalInfoKey).toString();
-            energyPanelKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedEnergyPanelKey).toString();
+            personalInfoKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedPersonalInfoKey);
+            personalInfoKeyString = personalInfoKey.toString();
+            energyPanelKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedEnergyPanelKey);
+            energyPanelKeyString = energyPanelKey.toString();
         }
         else {
             st.close();
@@ -49,6 +52,25 @@ public class Backoffice {
         }
         st.close();
     }
+
+    /*
+    -----------------------------------------------
+    -------------- WEBSERVER SERVICE --------------
+    -----------------------------------------------
+     */
+
+    public List<String> getCompartmentKeys() throws IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+        List<String> keys = new ArrayList<>();
+        keys.add(personalInfoKeyString);
+        keys.add(energyPanelKeyString);
+        return keys;
+    }
+
+    /*
+    ------------------------------------------------
+    ------------- ADMIN SESSION TOKEN --------------
+    ------------------------------------------------
+     */
 
     public String setAdminSession(String username) throws NoSuchAlgorithmException, SQLException {
 
@@ -92,6 +114,12 @@ public class Backoffice {
         }
         st.close();
     }
+
+    /*
+    -----------------------------------------------
+    ---------------- ADMIN SERVICE ----------------
+    -----------------------------------------------
+     */
 
     public void register(String username, String password, String role)
             throws SQLException, AdminAlreadyExistsException {
@@ -210,9 +238,9 @@ public class Backoffice {
 
         // get personal info
         st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
-        st.setString(1, personalInfoKey);
-        st.setString(2, personalInfoKey);
-        st.setString(3, personalInfoKey);
+        st.setString(1, personalInfoKeyString);
+        st.setString(2, personalInfoKeyString);
+        st.setString(3, personalInfoKeyString);
         st.setString(4, email);
         rs = st.executeQuery();
 
@@ -220,6 +248,7 @@ public class Backoffice {
             String name = rs.getString(1);
             email = rs.getString(2);
             String address = rs.getString(3);
+            System.out.println("address");
             String iban = rs.getString(4);
             String plan = rs.getString(5);
 
@@ -260,10 +289,10 @@ public class Backoffice {
         solarPanels = getSolarPanels(client_id);
 
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
-        st.setString(1, energyPanelKey);
-        st.setString(2, energyPanelKey);
-        st.setString(3, energyPanelKey);
-        st.setString(4, energyPanelKey);
+        st.setString(1, energyPanelKeyString);
+        st.setString(2, energyPanelKeyString);
+        st.setString(3, energyPanelKeyString);
+        st.setString(4, energyPanelKeyString);
         st.setString(5, email);
         rs = st.executeQuery();
 
@@ -346,9 +375,9 @@ public class Backoffice {
         List<Appliance> appliances = new ArrayList<>();
 
         st = dbConnection.prepareStatement(READ_APPLIANCES);
-        st.setString(1, energyPanelKey);
-        st.setString(2, energyPanelKey);
-        st.setString(3, energyPanelKey);
+        st.setString(1, energyPanelKeyString);
+        st.setString(2, energyPanelKeyString);
+        st.setString(3, energyPanelKeyString);
         st.setInt(4, clientId);
         rs = st.executeQuery();
 
@@ -379,7 +408,7 @@ public class Backoffice {
         List<SolarPanel> solarPanels = new ArrayList<>();
 
         st = dbConnection.prepareStatement(READ_SOLAR_PANELS);
-        st.setString(1, energyPanelKey);
+        st.setString(1, energyPanelKeyString);
         st.setInt(2, clientId);
         rs = st.executeQuery();
 

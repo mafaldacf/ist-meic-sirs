@@ -11,10 +11,10 @@ import java.security.SignatureException;
 import java.sql.SQLException;
 import java.util.List;
 
-public class BackofficeServiceImpl extends ServerServiceGrpc.ServerServiceImplBase {
+public class BackofficeAdminServiceImpl extends BackofficeAdminServiceGrpc.BackofficeAdminServiceImplBase {
 	private static Backoffice server;
 
-	public BackofficeServiceImpl(Backoffice backofficeServer) throws SQLException, ClassNotFoundException {
+	public BackofficeAdminServiceImpl(Backoffice backofficeServer) {
 		server = backofficeServer;
 	}
 
