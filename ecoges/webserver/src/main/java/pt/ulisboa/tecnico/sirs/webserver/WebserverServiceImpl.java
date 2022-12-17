@@ -5,10 +5,11 @@ import io.grpc.stub.StreamObserver;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,8 +17,8 @@ import java.util.List;
 public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBase {
 	private static Webserver server;
 
-	public WebserverServiceImpl(Connection dbConnection) throws SQLException, ClassNotFoundException {
-		this.server = new Webserver(dbConnection);
+	public WebserverServiceImpl(Webserver webServer) throws SQLException, ClassNotFoundException {
+		server = webServer;
 	}
 
 	@Override
@@ -34,8 +35,10 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (ClientAlreadyExistsException e){
 			responseObserver.onError(Status.ALREADY_EXISTS.withDescription(e.getMessage()).asRuntimeException());
-		} catch (NoSuchAlgorithmException e) {
+		} catch (NoSuchAlgorithmException | IllegalBlockSizeException | NoSuchPaddingException | InvalidKeyException e) {
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		} catch (CompartmentKeyException e) {
+			responseObserver.onError(Status.NOT_FOUND.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
 
@@ -84,7 +87,9 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (ApplianceAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (ApplianceAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException |
+				 CompartmentKeyException | IllegalBlockSizeException | NoSuchPaddingException |
+				 NoSuchAlgorithmException | InvalidKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -101,7 +106,9 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (SolarPanelAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (SolarPanelAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException |
+				 CompartmentKeyException | IllegalBlockSizeException | NoSuchPaddingException |
+				 NoSuchAlgorithmException | InvalidKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -118,8 +125,10 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException | InvalidSessionTokenException | ClientDoesNotExistException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		} catch (CompartmentKeyException e) {
+			responseObserver.onError(Status.NOT_FOUND.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
 
@@ -135,8 +144,10 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		} catch (CompartmentKeyException e) {
+			responseObserver.onError(Status.NOT_FOUND.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
 
@@ -168,7 +179,8 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException | CompartmentKeyException |
+				 IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -184,7 +196,8 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException | CompartmentKeyException |
+				 IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}

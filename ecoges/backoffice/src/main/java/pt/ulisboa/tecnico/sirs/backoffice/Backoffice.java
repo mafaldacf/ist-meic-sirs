@@ -4,7 +4,10 @@ import pt.ulisboa.tecnico.sirs.backoffice.exceptions.*;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
 import pt.ulisboa.tecnico.sirs.crypto.Crypto;
 
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.security.InvalidKeyException;
+import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.sql.*;
@@ -17,8 +20,34 @@ public class Backoffice {
 
     private final Connection dbConnection;
 
+    private String personalInfoKey;
+    private String energyPanelKey;
+
     public Backoffice(Connection dbConnection) {
         this.dbConnection = dbConnection;
+    }
+
+    public void loadCompartmentKeys(KeyPair keyPair) throws SQLException, CompartmentKeyException,
+            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+
+        PreparedStatement st;
+        byte[] wrappedPersonalInfoKey, wrappedEnergyPanelKey;
+        ResultSet rs;
+
+        st = dbConnection.prepareStatement(READ_COMPARTMENT_KEYS);
+        rs = st.executeQuery();
+
+        if (rs.next()){
+            wrappedPersonalInfoKey = rs.getBytes(1);
+            wrappedEnergyPanelKey = rs.getBytes(2);
+            personalInfoKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedPersonalInfoKey).toString();
+            energyPanelKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedEnergyPanelKey).toString();
+        }
+        else {
+            st.close();
+            throw new CompartmentKeyException();
+        }
+        st.close();
     }
 
     public String setAdminSession(String username) throws NoSuchAlgorithmException, SQLException {
@@ -171,16 +200,20 @@ public class Backoffice {
     }
 
     public PersonalInfo checkPersonalInfo(String username, String email, String hashedToken)
-            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException {
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException, InvalidRoleException, PermissionDeniedException {
         PersonalInfo personalInfo;
         PreparedStatement st;
         ResultSet rs;
 
         validateSession(username, hashedToken);
+        verifyPermissions(username, READ_PERMISSION_PERSONAL_INFO);
 
         // get personal info
         st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
-        st.setString(1, email);
+        st.setString(1, personalInfoKey);
+        st.setString(2, personalInfoKey);
+        st.setString(3, personalInfoKey);
+        st.setString(4, email);
         rs = st.executeQuery();
 
         if (rs.next()) {
@@ -189,6 +222,8 @@ public class Backoffice {
             String address = rs.getString(3);
             String iban = rs.getString(4);
             String plan = rs.getString(5);
+
+            System.out.println("name: " + name + " email: " + email + "address: " + address + "iban: " + iban + "plan" + plan);
 
             personalInfo = PersonalInfo.newBuilder()
                     .setName(name)
@@ -209,7 +244,7 @@ public class Backoffice {
     }
 
     public EnergyPanel checkEnergyPanel(String username, String email, String hashedToken)
-            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException {
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException, InvalidRoleException, PermissionDeniedException {
         EnergyPanel energyPanel;
         List<Appliance> appliances;
         List<SolarPanel> solarPanels;
@@ -217,13 +252,19 @@ public class Backoffice {
         ResultSet rs;
 
         validateSession(username, hashedToken);
+        verifyPermissions(username, READ_PERMISSION_ENERGY_PANEL);
+
         int client_id = getClientId(email);
 
         appliances = getAppliances(client_id);
         solarPanels = getSolarPanels(client_id);
 
-        st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION_PRODUCTION);
-        st.setString(1, email);
+        st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
+        st.setString(1, energyPanelKey);
+        st.setString(2, energyPanelKey);
+        st.setString(3, energyPanelKey);
+        st.setString(4, energyPanelKey);
+        st.setString(5, email);
         rs = st.executeQuery();
 
         if (rs.next()) {
@@ -299,13 +340,16 @@ public class Backoffice {
         return client_id;
     }
 
-    public List<Appliance> getAppliances(int client_id) throws SQLException {
+    public List<Appliance> getAppliances(int clientId) throws SQLException {
         PreparedStatement st;
         ResultSet rs;
         List<Appliance> appliances = new ArrayList<>();
 
         st = dbConnection.prepareStatement(READ_APPLIANCES);
-        st.setInt(1, client_id);
+        st.setString(1, energyPanelKey);
+        st.setString(2, energyPanelKey);
+        st.setString(3, energyPanelKey);
+        st.setInt(4, clientId);
         rs = st.executeQuery();
 
         while (rs.next()) {
@@ -329,13 +373,14 @@ public class Backoffice {
         return appliances;
     }
 
-    public List<SolarPanel> getSolarPanels(int client_id) throws SQLException {
+    public List<SolarPanel> getSolarPanels(int clientId) throws SQLException {
         PreparedStatement st;
         ResultSet rs;
         List<SolarPanel> solarPanels = new ArrayList<>();
 
         st = dbConnection.prepareStatement(READ_SOLAR_PANELS);
-        st.setInt(1, client_id);
+        st.setString(1, energyPanelKey);
+        st.setInt(2, clientId);
         rs = st.executeQuery();
 
 
@@ -354,6 +399,44 @@ public class Backoffice {
         st.close();
 
         return solarPanels;
+    }
+
+    public void verifyPermissions(String username, String permissionQuery) throws SQLException, AdminDoesNotExistException, InvalidRoleException, PermissionDeniedException {
+        PreparedStatement st;
+        ResultSet rs;
+        String role;
+
+        st = dbConnection.prepareStatement(READ_ADMIN_ROLE);
+        st.setString(1, username);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            role = rs.getString(1);
+        }
+        else {
+            throw new AdminDoesNotExistException(username);
+        }
+
+        st.close();
+
+        st = dbConnection.prepareStatement(permissionQuery);
+        st.setString(1, role);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            boolean permitted = rs.getBoolean(1);
+            if (!permitted) {
+                st.close();
+                throw new PermissionDeniedException(role);
+            }
+
+        }
+        else {
+            st.close();
+            throw new InvalidRoleException(role);
+        }
+
+        st.close();
     }
 
 }

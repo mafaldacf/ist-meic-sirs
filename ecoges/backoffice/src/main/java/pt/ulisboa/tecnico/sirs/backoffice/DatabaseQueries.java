@@ -1,8 +1,18 @@
 package pt.ulisboa.tecnico.sirs.backoffice;
 
 public class DatabaseQueries {
-
     public static final String DROP_ADMIN_TABLE = "DROP TABLE IF EXISTS admin";
+    public static final String DROP_ROLE_PERMISSION_TABLE = "DROP TABLE IF EXISTS permission";
+
+    public static final String DROP_COMPARTMENT_KEYS_TABLE = "DROP TABLE IF EXISTS compartment_keys";
+
+    public static final String CREATE_COMPARTMENT_KEYS_TABLE =
+            "CREATE TABLE compartment_keys (" +
+                    "id INTEGER NOT NULL AUTO_INCREMENT, " +
+                    "personal_info_key BLOB NOT NULL, " +
+                    "energy_panel_key BLOB NOT NULL, " +
+                    "PRIMARY KEY (id))";
+    //"ENGINE=InnoDB ENCRYPTION='Y'";
 
     public static final String CREATE_ADMIN_TABLE =
         "CREATE TABLE admin (id INTEGER NOT NULL AUTO_INCREMENT, " +
@@ -14,19 +24,39 @@ public class DatabaseQueries {
         "PRIMARY KEY (id)) ";
         //"ENGINE=InnoDB ENCRYPTION='Y'";
 
+    public static final String CREATE_PERMISSION_TABLE =
+            "CREATE TABLE permission (" +
+                    "id INTEGER NOT NULL AUTO_INCREMENT, " +
+                    "role VARCHAR(25) NOT NULL, " +
+                    "personal_info BOOLEAN NOT NULL, " +
+                    "energy_panel BOOLEAN NOT NULL, " +
+                    "UNIQUE (role), " +
+                    "PRIMARY KEY(id)) ";
+                    //"ENGINE=InnoDB ENCRYPTION='Y'";
+
     public static final String CREATE_ADMIN = "INSERT INTO admin(username, password, role) VALUES(?, ?, ?)";
+    public static final String CREATE_PERMISSION = "INSERT INTO permission(role, personal_info, energy_panel) VALUES(?, ?, ?)";
+
+    public static final String CREATE_COMPARTMENT_KEYS = "INSERT INTO compartment_keys(personal_info_key, energy_panel_key) VALUES(?, ?)";
+
+    public static final String READ_COMPARTMENT_KEYS = "SELECT personal_info_key, energy_panel_key FROM compartment_keys";
+
+    public static final String READ_COMPARTMENT_KEYS_COUNT = "SELECT COUNT(*) FROM compartment_keys";
 
     public static final String READ_ADMIN_PASSWORD_ROLE = "SELECT password, role FROM admin WHERE username = ?";
+    public static final String READ_ADMIN_ROLE = "SELECT role FROM admin WHERE username = ?";
+    public static final String READ_PERMISSION_PERSONAL_INFO = "SELECT personal_info FROM permission WHERE role = ?";
+    public static final String READ_PERMISSION_ENERGY_PANEL = "SELECT energy_panel FROM permission WHERE role = ?";
 
     public static final String READ_CLIENT_ID = "SELECT id FROM client WHERE email = ?";
-    public static final String READ_CLIENT_ENERGY_CONSUMPTION_PRODUCTION = "SELECT energyConsumed, energyConsumedDaytime, energyConsumedNight, energyProduced FROM client WHERE email= ? ";
+    public static final String READ_CLIENT_ENERGY_PANEL = "SELECT AES_DECRYPT(energyConsumed, ?), AES_DECRYPT(energyConsumedDaytime, ?), AES_DECRYPT(energyConsumedNight, ?), AES_DECRYPT(energyProduced, ?) FROM client WHERE email = ? ";
 
     public static final String READ_ADMIN_TOKEN = "SELECT token FROM admin WHERE username = ?";
 
-    public static final String READ_APPLIANCES = "SELECT name, brand, energyConsumed, energyConsumedDaytime, energyConsumedNight FROM appliance WHERE client_id = ? ";
-    public static final String READ_SOLAR_PANELS = "SELECT name, brand, energyProduced FROM solarpanel WHERE client_id = ? ";
+    public static final String READ_APPLIANCES = "SELECT name, brand, AES_DECRYPT(energyConsumed, ?), AES_DECRYPT(energyConsumedDaytime, ?), AES_DECRYPT(energyConsumedNight, ?) FROM appliance WHERE client_id = ? ";
+    public static final String READ_SOLAR_PANELS = "SELECT name, brand, AES_DECRYPT(energyProduced, ?) FROM solarpanel WHERE client_id = ? ";
 
-    public static final String READ_CLIENT_PERSONAL_INFO = "SELECT name, email, address, iban, plan FROM client WHERE email = ?";
+    public static final String READ_CLIENT_PERSONAL_INFO = "SELECT name, email, AES_DECRYPT(address, ?), AES_DECRYPT(iban, ?), AES_DECRYPT(plan, ?) FROM client WHERE email = ?";
 
     public static final String READ_ADMIN_COUNT = "SELECT COUNT(*) FROM admin WHERE username = ?";
     public static final String READ_ALL_CLIENTS_NAME_EMAIL = "SELECT name, email FROM client";

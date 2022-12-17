@@ -1,12 +1,15 @@
 package pt.ulisboa.tecnico.sirs.crypto;
 
 import com.google.protobuf.ByteString;
+
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
 
 public class Crypto {
 
@@ -40,7 +43,14 @@ public class Crypto {
         return bytes;
     }
 
-    private static String bytesToHex(byte[] bytes) {
+    public static byte[] randomBytes(int n) throws NoSuchAlgorithmException {
+        SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+        byte[] bytes = new byte[n];
+        random.nextBytes(bytes);
+        return bytes;
+    }
+
+    public static String bytesToHex(byte[] bytes) {
         StringBuilder hexString = new StringBuilder(2 * bytes.length);
         for (byte aByte : bytes) {
             String hex = Integer.toHexString(0xff & aByte);
@@ -50,6 +60,20 @@ public class Crypto {
             hexString.append(hex);
         }
         return hexString.toString();
+    }
+
+    public static byte[] wrapKey(PublicKey publicKey, Key secretKey) throws InvalidKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException {
+        Cipher cipher = Cipher.getInstance("RSA/ECB/NoPadding");
+        cipher.init(Cipher.WRAP_MODE, publicKey);
+        final byte[] wrapped = cipher.wrap(secretKey);
+        return wrapped;
+    }
+
+    public static Key unwrapKey(PublicKey publicKey, byte[] wrappedSecretKey) throws InvalidKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException {
+        Cipher cipher = Cipher.getInstance("RSA/ECB/NoPadding");
+        cipher.init(Cipher.UNWRAP_MODE, publicKey);
+        Key secretKey = cipher.unwrap(wrappedSecretKey, "AES", Cipher.SECRET_KEY);
+        return secretKey;
     }
 
     public static KeyPair generateKeyPair() throws NoSuchAlgorithmException {

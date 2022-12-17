@@ -4,9 +4,9 @@ import pt.ulisboa.tecnico.sirs.crypto.Crypto;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SignatureException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import java.security.*;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,14 +16,50 @@ import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
 
 public class Webserver {
     private final Connection dbConnection;
+
+
+    private String personalInfoKey;
+    private String energyPanelKey;
+
     private final int MAX_ENERGY_CONSUMPTION = 100;
     private final int MAX_ENERGY_PRODUCTION = 100;
 
-    private static List<String> months = new ArrayList<>(Arrays.asList
+    private static final List<String> months = new ArrayList<>(Arrays.asList
             ("Jan", "Feb", "Mar", "Apr", "Mai", "Jun", "Jul", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"));
 
     public Webserver(Connection dbConnection) {
         this.dbConnection = dbConnection;
+    }
+
+    public void loadCompartmentKeys(KeyPair keyPair) throws SQLException, CompartmentKeyException,
+            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+
+        PreparedStatement st;
+        byte[] wrappedPersonalInfoKey, wrappedEnergyPanelKey;
+        ResultSet rs;
+
+        st = dbConnection.prepareStatement(READ_COMPARTMENT_KEYS);
+        rs = st.executeQuery();
+
+        if (rs.next()){
+            wrappedPersonalInfoKey = rs.getBytes(1);
+            wrappedEnergyPanelKey = rs.getBytes(2);
+            personalInfoKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedPersonalInfoKey).toString();
+            energyPanelKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedEnergyPanelKey).toString();
+        }
+        else {
+            st.close();
+            throw new CompartmentKeyException();
+        }
+        st.close();
+    }
+
+    public String getPersonalInfoKey() {
+        return personalInfoKey;
+    }
+
+    public String getEnergyPanelKey() {
+        return energyPanelKey;
     }
 
     /*
@@ -79,7 +115,8 @@ public class Webserver {
     ------------------------------------------------------
      */
 
-    public void register(String name, String email, String password, String address, String iban, String plan) throws SQLException, ClientAlreadyExistsException, NoSuchAlgorithmException {
+    public void register(String name, String email, String password, String address, String iban, String plan)
+            throws SQLException, ClientAlreadyExistsException, NoSuchAlgorithmException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidKeyException {
         PreparedStatement st;
         ResultSet rs;
 
@@ -90,10 +127,14 @@ public class Webserver {
         rs = st.executeQuery();
 
         if (rs.next() && rs.getInt(1) != 0){
+            st.close();
             throw new ClientAlreadyExistsException(email);
         }
 
         st.close();
+
+        String personalInfoKeyString = getPersonalInfoKey();
+        String energyPanelKeyString = getEnergyPanelKey();
 
         // create client
 
@@ -103,11 +144,26 @@ public class Webserver {
         st = dbConnection.prepareStatement(CREATE_CLIENT);
         st.setString(1, name);
         st.setString(2, email);
-        st.setString(3, address);
-        st.setString(4, hashedPassword);
-        st.setString(5, iban);
-        st.setString(6, plan);
-        st.setBytes(7, salt);
+        st.setString(3, hashedPassword);
+        st.setBytes(4, salt);
+
+        // encrypted compartment: personal info
+        st.setString(5, address);
+        st.setString(6, personalInfoKeyString);
+        st.setString(7, iban);
+        st.setString(8, personalInfoKeyString);
+        st.setString(9, plan);
+        st.setString(10, personalInfoKeyString);
+
+        // encrypted compartment: energy panel
+        st.setFloat(11, 0);
+        st.setString(12, energyPanelKeyString);
+        st.setFloat(13, 0);
+        st.setString(14, energyPanelKeyString);
+        st.setFloat(15, 0);
+        st.setString(16, energyPanelKeyString);
+        st.setFloat(17, 0);
+        st.setString(18, energyPanelKeyString);
         st.executeUpdate();
         st.close();
     }
@@ -163,7 +219,9 @@ public class Webserver {
     }
 
     public void addApplicance(String email, String applianceName, String applianceBrand, String hashedToken)
-            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, ApplianceAlreadyExistsException {
+            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, ApplianceAlreadyExistsException,
+            CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException,
+            InvalidKeyException {
 
         PreparedStatement st;
         ResultSet rs;
@@ -191,14 +249,19 @@ public class Webserver {
         float energyConsumedNight = (float)(Math.random()*MAX_ENERGY_CONSUMPTION);
         float energyConsumed = energyConsumedDaytime + energyConsumedNight;
 
+        String energyPanelKeyString = getEnergyPanelKey();
+
         // add appliance
         st = dbConnection.prepareStatement(CREATE_APPLIANCE);
         st.setInt(1, getClientId(email));
         st.setString(2, applianceName);
         st.setString(3, applianceBrand);
         st.setFloat(4, energyConsumed);
-        st.setFloat(5, energyConsumedDaytime);
-        st.setFloat(6, energyConsumedNight);
+        st.setString(5, energyPanelKeyString);
+        st.setFloat(6, energyConsumedDaytime);
+        st.setString(7, energyPanelKeyString);
+        st.setFloat(8, energyConsumedNight);
+        st.setString(9, energyPanelKeyString);
         st.executeUpdate();
         st.close();
 
@@ -206,7 +269,10 @@ public class Webserver {
     }
 
     public void addSolarPanel(String email, String solarPanelName, String solarPanelBrand, String hashedToken)
-            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, SolarPanelAlreadyExistsException {
+            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, SolarPanelAlreadyExistsException,
+            CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException,
+            InvalidKeyException {
+
         PreparedStatement st;
         ResultSet rs;
 
@@ -229,29 +295,42 @@ public class Webserver {
         // generate random energy produced
         float energyProduced = (float)(Math.random()*MAX_ENERGY_PRODUCTION);
 
+        String energyPanelKeyString = getEnergyPanelKey();
+
         // add solar panel
         st = dbConnection.prepareStatement(CREATE_SOLAR_PANEL);
         st.setInt(1, client_id);
         st.setString(2, solarPanelName);
         st.setString(3, solarPanelBrand);
         st.setFloat(4, energyProduced);
+        st.setString(5, energyPanelKeyString);
         st.executeUpdate();
         st.close();
 
         updateEnergyProduction(email, energyProduced);
     }
 
-    public PersonalInfo checkPersonalInfo(String clientEmail, String hashedToken)
-            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException {
+    public PersonalInfo checkPersonalInfo(String clientEmail, String hashedToken) throws ClientDoesNotExistException,
+            SQLException, InvalidSessionTokenException, CompartmentKeyException, IllegalBlockSizeException,
+            NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+
         PersonalInfo personalInfo;
         PreparedStatement st;
         ResultSet rs;
 
         validateSession(clientEmail, hashedToken);
 
+        String personalInfoKeyString = getPersonalInfoKey();
+
         // get personal info
         st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
-        st.setString(1, clientEmail);
+
+        //encrypted compartment: personal info
+        st.setString(1, personalInfoKeyString);
+        st.setString(2, personalInfoKeyString);
+        st.setString(3, personalInfoKeyString);
+
+        st.setString(4, clientEmail);
         rs = st.executeQuery();
 
         if (rs.next()) {
@@ -280,7 +359,10 @@ public class Webserver {
     }
 
     public EnergyPanel checkEnergyPanel(String email, String hashedToken)
-            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException {
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException,
+            CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException,
+            NoSuchAlgorithmException, InvalidKeyException {
+
         EnergyPanel energyPanel;
         List<Appliance> appliances;
         List<SolarPanel> solarPanels;
@@ -293,8 +375,16 @@ public class Webserver {
         appliances = getAppliances(client_id);
         solarPanels = getSolarPanels(client_id);
 
-        st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION_PRODUCTION);
-        st.setString(1, email);
+        String energyPanelKeyString = getEnergyPanelKey();
+
+        st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
+        //encrypted compartment: energy panel
+        st.setString(1, energyPanelKeyString);
+        st.setString(2, energyPanelKeyString);
+        st.setString(3, energyPanelKeyString);
+        st.setString(4, energyPanelKeyString);
+
+        st.setString(5, email);
         rs = st.executeQuery();
 
         if (rs.next()) {
@@ -364,28 +454,37 @@ public class Webserver {
     }
 
     public void updateAddress(String email, String address, String hashedToken)
-            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException, CompartmentKeyException,
+            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+
         PreparedStatement st;
 
         validateSession(email, hashedToken);
 
+        String personalInfoKeyString = getPersonalInfoKey();
+
         // update address
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ADDRESS);
         st.setString(1, address);
-        st.setString(2, email);
+        st.setString(2, personalInfoKeyString);
+        st.setString(3, email);
         st.executeUpdate();
         st.close();
     }
 
     public void updatePlan(String email, String plan, String hashedToken)
-            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException, CompartmentKeyException,
+            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
 
         validateSession(email, hashedToken);
+
+        String personalInfoKeyString = getPersonalInfoKey();
 
         // update plan
         PreparedStatement st = dbConnection.prepareStatement(UPDATE_CLIENT_PLAN);
         st.setString(1, plan);
-        st.setString(2, email);
+        st.setString(2, personalInfoKeyString);
+        st.setString(3, email);
         st.executeUpdate();
         st.close();
     }
@@ -419,16 +518,24 @@ public class Webserver {
     }
 
     public void updateEnergyConsumption(String email, float energyConsumed, float energyConsumedDaytime, float energyConsumedNight)
-            throws SQLException, ClientDoesNotExistException {
+            throws SQLException, ClientDoesNotExistException, CompartmentKeyException, IllegalBlockSizeException,
+            NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+
         PreparedStatement st;
         ResultSet rs;
         float currEnergyConsumed;
         float currEnergyConsumedDaytime;
         float currEnergyConsumedNight;
 
+        String energyPanelKeyString = getEnergyPanelKey();
+
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION);
-        st.setString(1, email);
+        st.setString(1, energyPanelKeyString);
+        st.setString(2, energyPanelKeyString);
+        st.setString(3, energyPanelKeyString);
+        st.setString(4, email);
+
         rs = st.executeQuery();
         if (rs.next()){
             currEnergyConsumed = rs.getFloat(1);
@@ -443,46 +550,64 @@ public class Webserver {
         // update energy consumption
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ENERGY_CONSUMPTION);
         st.setFloat(1, currEnergyConsumed + energyConsumed);
-        st.setFloat(2, currEnergyConsumedDaytime + energyConsumedDaytime);
-        st.setFloat(3, currEnergyConsumedNight + energyConsumedNight);
-        st.setString(4, email);
+        st.setString(2, energyPanelKeyString);
+        st.setFloat(3, currEnergyConsumedDaytime + energyConsumedDaytime);
+        st.setString(4, energyPanelKeyString);
+        st.setFloat(5, currEnergyConsumedNight + energyConsumedNight);
+        st.setString(6, energyPanelKeyString);
+        st.setString(7, email);
         st.executeUpdate();
         st.close();
     }
 
-    public void updateEnergyProduction(String email, float energyProduced) throws SQLException, ClientDoesNotExistException {
+    public void updateEnergyProduction(String email, float energyProduced) throws SQLException, ClientDoesNotExistException,
+            CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException,
+            InvalidKeyException {
+
         PreparedStatement st;
         ResultSet rs;
         float currEnergyProduced;
 
+        String energyPanelKeyString = getEnergyPanelKey();
+
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PRODUCTION);
-        st.setString(1, email);
+        st.setString(1, energyPanelKeyString);
+        st.setString(2, email);
         rs = st.executeQuery();
         if (rs.next()){
             currEnergyProduced = rs.getFloat(1);
         }
         else {
+            st.close();
             throw new ClientDoesNotExistException(email);
         }
-        currEnergyProduced = rs.getFloat(1);
         st.close();
 
         // update energy consumption
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ENERGY_PRODUCTION);
         st.setFloat(1, currEnergyProduced + energyProduced);
-        st.setString(2, email);
+        st.setString(2, energyPanelKeyString);
+        st.setString(3, email);
         st.executeUpdate();
         st.close();
     }
 
-    public List<Appliance> getAppliances(int client_id) throws SQLException {
+    public List<Appliance> getAppliances(int clientId)
+            throws SQLException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException,
+            NoSuchAlgorithmException, InvalidKeyException {
+
         PreparedStatement st;
         ResultSet rs;
         List<Appliance> appliances = new ArrayList<>();
 
+        String energyPanelKeyString = getEnergyPanelKey();
+
         st = dbConnection.prepareStatement(READ_APPLIANCES);
-        st.setInt(1, client_id);
+        st.setString(1, energyPanelKeyString);
+        st.setString(2, energyPanelKeyString);
+        st.setString(3, energyPanelKeyString);
+        st.setInt(4, clientId);
         rs = st.executeQuery();
 
         while (rs.next()) {
@@ -506,20 +631,25 @@ public class Webserver {
         return appliances;
     }
 
-    public List<SolarPanel> getSolarPanels(int client_id) throws SQLException {
+    public List<SolarPanel> getSolarPanels(int clientId) throws SQLException, CompartmentKeyException,
+            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+
         PreparedStatement st;
         ResultSet rs;
         List<SolarPanel> solarPanels = new ArrayList<>();
 
+        String energyPanelKeyString = getEnergyPanelKey();
+
         st = dbConnection.prepareStatement(READ_SOLAR_PANELS);
-        st.setInt(1, client_id);
+        st.setString(1, energyPanelKeyString);
+        st.setInt(2, clientId);
         rs = st.executeQuery();
 
 
         while (rs.next()) {
             String name = rs.getString(1);
             String brand = rs.getString(2);
-            float energyProduced = rs.getInt(3);
+            float energyProduced = rs.getFloat(3);
 
             SolarPanel solarPanel = SolarPanel.newBuilder()
                     .setName(name)
