@@ -10,6 +10,8 @@ service ServerService {
 	rpc register(RegisterRequest) returns (AckResponse);
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);
+	rpc loginMobile(LoginMobileRequest) returns (LoginMobileResponse);
+	rpc logoutMobile(LogoutMobileRequest) returns (AckResponse);
 	rpc addAppliance(AddEquipmentRequest) returns (AckResponse);
 	rpc addSolarPanel(AddEquipmentRequest) returns (AckResponse);
 	rpc checkPersonalInfo(CheckPersonalInfoRequest) returns (CheckPersonalInfoResponse);
@@ -53,6 +55,25 @@ message LoginResponse {
 // Logout
 
 message LogoutRequest {
+	string email = 1;
+	string hashedToken = 2;
+}
+
+// Login Mobile
+
+message LoginMobileRequest {
+	string email = 1;
+	string password = 2;
+}
+
+message LoginMobileResponse {
+	string name = 1;
+	string hashedToken = 2;
+}
+
+// Logout Mobile
+
+message LogoutMobileRequest {
 	string email = 1;
 	string hashedToken = 2;
 }
