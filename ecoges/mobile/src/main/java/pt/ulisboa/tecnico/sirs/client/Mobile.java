@@ -29,8 +29,8 @@ public class Mobile {
 
 	public static ArrayList<String> login(String email, String password) {
 		try {
-			LoginMobileRequest request = LoginMobileRequest.newBuilder().setEmail(email).setPassword(password).build();
-			LoginMobileResponse response = server.loginMobile(request);
+			RegisterMobileRequest request = RegisterMobileRequest.newBuilder().setEmail(email).setPassword(password).build();
+			RegisterMobileResponse response = server.registerMobile(request);
 			ArrayList<String> cred = new ArrayList<>();
 			cred.add(response.getName());
 			cred.add(response.getHashedToken());

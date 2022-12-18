@@ -10,8 +10,10 @@ service ServerService {
 	rpc register(RegisterRequest) returns (AckResponse);
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);
-	rpc loginMobile(LoginMobileRequest) returns (LoginMobileResponse);
-	rpc logoutMobile(LogoutMobileRequest) returns (AckResponse);
+	rpc registerMobile(RegisterMobileRequest) returns (RegisterMobileResponse);
+	//rpc logoutMobile(LogoutMobileRequest) returns (LogoutMobileResponse);
+	//rpc tokenMobile(TokenMobileRequest) returns (TokenMobileResponse);
+	//rpc twoFactorMobile(TwoFactorMobileRequest) returns (TwoFactorMobileResponse);
 	rpc addAppliance(AddEquipmentRequest) returns (AckResponse);
 	rpc addSolarPanel(AddEquipmentRequest) returns (AckResponse);
 	rpc checkPersonalInfo(CheckPersonalInfoRequest) returns (CheckPersonalInfoResponse);
@@ -61,22 +63,22 @@ message LogoutRequest {
 
 // Login Mobile
 
-message LoginMobileRequest {
+message RegisterMobileRequest {
 	string email = 1;
 	string password = 2;
 }
 
-message LoginMobileResponse {
+message RegisterMobileResponse {
 	string name = 1;
 	string hashedToken = 2;
 }
 
 // Logout Mobile
-
+/*
 message LogoutMobileRequest {
 	string email = 1;
 	string hashedToken = 2;
-}
+}*/
 
 // Add appliance or solar panel
 
