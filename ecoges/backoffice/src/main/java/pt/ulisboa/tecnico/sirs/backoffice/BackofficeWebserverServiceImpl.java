@@ -27,10 +27,10 @@ public class BackofficeWebserverServiceImpl extends BackofficeWebserverServiceGr
 	public void getCompartmentKeys(getCompartmentKeysRequest request, StreamObserver<getCompartmentKeysResponse> responseObserver) {
 		try {
 			getCompartmentKeysResponse.Builder builder = getCompartmentKeysResponse.newBuilder();
-			List<String> keys = server.getCompartmentKeys();
+			List<byte[]> keys = server.getCompartmentKeys();
 
-			builder.setPersonalInfoKeyString(keys.get(0));
-			builder.setEnergyPanelKeyString(keys.get(1));
+			builder.setPersonalInfoKey(ByteString.copyFrom(keys.get(0)));
+			builder.setEnergyPanelKey(ByteString.copyFrom(keys.get(1)));
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();

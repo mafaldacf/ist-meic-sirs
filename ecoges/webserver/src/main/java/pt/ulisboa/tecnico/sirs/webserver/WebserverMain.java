@@ -33,6 +33,11 @@ public class WebserverMain {
 
 	private static boolean gotCompartmentKeys = false;
 
+	private static final String KEY_STORE_FILE = "src/main/resources/webserver.jks";
+	private static final String KEY_STORE_TYPE = "JKS";
+	private static final String KEY_STORE_PASSWORD = "webserver";
+	private static final String KEY_STORE_ALIAS_WEBSERVER = "webserver";
+
 	// TLS
 	private static InputStream cert;
 	private static InputStream key;
@@ -173,13 +178,23 @@ public class WebserverMain {
 				getCompartmentKeysRequest request = getCompartmentKeysRequest.newBuilder().build();
 				getCompartmentKeysResponse response = backofficeServer.getCompartmentKeys(request);
 
-				server.setPersonalInfoKeyString(response.getPersonalInfoKeyString());
-				server.setEnergyPanelKeyString(response.getEnergyPanelKeyString());
+				// decrypt received keys with own private key
+				KeyStore keyStore = KeyStore.getInstance(KEY_STORE_TYPE);
+				keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
+				PrivateKey privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_WEBSERVER, KEY_STORE_PASSWORD.toCharArray());
+
+				Key personalInfoKey = Crypto.unwrapKey(privateKey, response.getPersonalInfoKey().toByteArray());
+				Key energyPanelKey = Crypto.unwrapKey(privateKey, response.getEnergyPanelKey().toByteArray());
+
+				server.setPersonalInfoKeyString(personalInfoKey.toString());
+				server.setEnergyPanelKeyString(energyPanelKey.toString());
 
 				gotCompartmentKeys = true;
 
 				System.out.print("Successfully loaded compartment keys!\n");
-			} catch (StatusRuntimeException e) {
+			} catch (StatusRuntimeException | KeyStoreException | IOException | NoSuchAlgorithmException |
+					 UnrecoverableKeyException | CertificateException | InvalidKeyException |
+					 IllegalBlockSizeException | NoSuchPaddingException e) {
 				System.out.println(e.getMessage());
 			}
 		}

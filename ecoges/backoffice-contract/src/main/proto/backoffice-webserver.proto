@@ -15,6 +15,6 @@ message getCompartmentKeysRequest {
 }
 
 message getCompartmentKeysResponse {
-  string personalInfoKeyString = 1;
-  string energyPanelKeyString = 2;
+  bytes personalInfoKey = 1;
+  bytes energyPanelKey = 2;
 }

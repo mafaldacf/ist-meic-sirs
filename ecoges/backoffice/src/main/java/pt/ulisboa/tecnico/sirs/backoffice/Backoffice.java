@@ -80,14 +80,14 @@ public class Backoffice {
     -----------------------------------------------
      */
 
-    public List<String> getCompartmentKeys() throws IllegalBlockSizeException, NoSuchPaddingException,
+    public List<byte[]> getCompartmentKeys() throws IllegalBlockSizeException, NoSuchPaddingException,
             NoSuchAlgorithmException, InvalidKeyException, SQLException, CompartmentKeyException, KeyStoreException,
             IOException, CertificateException {
 
         PreparedStatement st;
         byte[] wrappedPersonalInfoKey, wrappedEnergyPanelKey;
         ResultSet rs;
-        String personalInfoKeyString, energyPanelKeyString;
+        Key personalInfoKey, energyPanelKey;
 
         // get all compartment keys
         st = dbConnection.prepareStatement(READ_COMPARTMENT_KEYS);
@@ -96,12 +96,8 @@ public class Backoffice {
         if (rs.next()){
             wrappedPersonalInfoKey = rs.getBytes(1);
             wrappedEnergyPanelKey = rs.getBytes(2);
-
-            Key personalInfoKey = Crypto.unwrapKey(backofficeKeyPair.getPrivate(), wrappedPersonalInfoKey);
-            personalInfoKeyString = personalInfoKey.toString();
-
-            Key energyPanelKey = Crypto.unwrapKey(backofficeKeyPair.getPrivate(), wrappedEnergyPanelKey);
-            energyPanelKeyString = energyPanelKey.toString();
+            personalInfoKey = Crypto.unwrapKey(backofficeKeyPair.getPrivate(), wrappedPersonalInfoKey);
+            energyPanelKey = Crypto.unwrapKey(backofficeKeyPair.getPrivate(), wrappedEnergyPanelKey);
         }
         else {
             st.close();
@@ -113,13 +109,11 @@ public class Backoffice {
 
         KeyStore keyStore = KeyStore.getInstance(KEY_STORE_TYPE);
         keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
-
-        // Backoffice key pair
         PublicKey webserverPublicKey = keyStore.getCertificate(KEY_STORE_ALIAS_WEBSERVER).getPublicKey();
 
-        List<String> keys = new ArrayList<>();
-        keys.add(personalInfoKeyString);
-        keys.add(energyPanelKeyString);
+        List<byte[]> keys = new ArrayList<>();
+        keys.add(Crypto.wrapKey(webserverPublicKey, personalInfoKey));
+        keys.add(Crypto.wrapKey(webserverPublicKey, energyPanelKey));
         return keys;
     }
 
