@@ -136,7 +136,7 @@ public class Admin {
 				for (Appliance appliance : energyPanel.getAppliancesList()) {
 					result += "\t" + appliance.getName() + " (" + appliance.getBrand() + ")" + " > Total: "
 							+ appliance.getEnergyConsumed() + " kWh, Daytime: " + appliance.getEnergyConsumedDaytime()
-							+ " kWh, Night: " + appliance.getEnergyConsumedNight() + "\n";
+							+ " kWh, Night: " + appliance.getEnergyConsumedNight() + "kWh \n";
 				}
 			}
 

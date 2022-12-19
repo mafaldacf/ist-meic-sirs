@@ -5,6 +5,8 @@ import io.grpc.stub.StreamObserver;
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.*;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
 
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
@@ -103,7 +105,8 @@ public class BackofficeAdminServiceImpl extends BackofficeAdminServiceGrpc.Backo
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidRoleException | AdminDoesNotExistException | InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidRoleException | AdminDoesNotExistException | InvalidSessionTokenException | ClientDoesNotExistException |
+				CompartmentKeyException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		} catch (PermissionDeniedException e) {
 			responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());
@@ -122,7 +125,9 @@ public class BackofficeAdminServiceImpl extends BackofficeAdminServiceGrpc.Backo
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidRoleException | AdminDoesNotExistException | InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidRoleException | AdminDoesNotExistException | InvalidSessionTokenException |
+				 ClientDoesNotExistException | CompartmentKeyException | IllegalBlockSizeException |
+				 NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		} catch (PermissionDeniedException e) {
 			responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());

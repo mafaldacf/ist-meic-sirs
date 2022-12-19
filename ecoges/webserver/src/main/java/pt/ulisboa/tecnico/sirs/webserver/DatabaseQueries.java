@@ -82,9 +82,6 @@ public class DatabaseQueries {
             "INSERT INTO invoice(client_id, year, month, paymentAmount, energyConsumed, energyConsumedDaytime, energyConsumedNight, plan, taxes) " +
                     "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)";
     public static final String READ_CLIENT_NAME_PASSWORD_SALT = "SELECT name, password, salt FROM client WHERE email = ?";
-    public static final String READ_COMPARTMENT_KEYS = "SELECT personal_info_key, energy_panel_key FROM compartment_keys";
-
-    public static final String READ_COMPARTMENT_KEYS_COUNT = "SELECT COUNT(*) FROM compartment_keys";
 
     public static final String READ_CLIENT_ID = "SELECT id FROM client WHERE email = ?";
 

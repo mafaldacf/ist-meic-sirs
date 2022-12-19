@@ -34,8 +34,16 @@ public class BackofficeMain {
 	private static final String KEY_STORE_TYPE = "JKS";
 	private static final String KEY_STORE_PASSWORD = "backoffice";
 	private static final String KEY_STORE_ALIAS_BACKOFFICE = "backoffice";
+	private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
+	private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
 
-	private static KeyPair keyPair;
+	private static KeyPair backofficeKeyPair;
+	private static KeyPair accountManagementKeyPair;
+	private static KeyPair energyManagementKeyPair;
+
+	private static Key personalInfoKey;
+
+	private static Key energyPanelKey;
 
 	// Database
 
@@ -80,7 +88,7 @@ public class BackofficeMain {
 			SslContext sslContext = GrpcSslContexts.forServer(cert, key).build();
 			System.out.println(">>> " + BackofficeMain.class.getSimpleName() + " <<<");
 
-			loadKeyPair();
+			loadKeyPairs();
 
 			// Database
 			System.out.println("Setting up database connection on " + DATABASE_URL);
@@ -89,8 +97,7 @@ public class BackofficeMain {
 			if (dbConnection != null) setupDatabase();
 
 			// Services
-			backofficeServer = new Backoffice(dbConnection, keyPair);
-			backofficeServer.loadCompartmentKeys();
+			backofficeServer = new Backoffice(dbConnection, backofficeKeyPair, accountManagementKeyPair, energyManagementKeyPair);
 			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext)
 					.addService(new BackofficeAdminServiceImpl(backofficeServer))
 					.addService(new BackofficeWebserverServiceImpl(backofficeServer))
@@ -111,21 +118,33 @@ public class BackofficeMain {
 			System.out.println("ERROR: Database class not found: " + e.getMessage());
 		} catch (UnrecoverableKeyException | CertificateException | NoSuchAlgorithmException | KeyStoreException e) {
 			System.out.println("ERROR: Could not load key pair: " + e.getMessage());
-		} catch (CompartmentKeyException | IllegalBlockSizeException | NoSuchPaddingException | InvalidKeyException e) {
-			System.out.println("ERROR: Could not load compartment keys: " + e.getMessage());
 		}
 	}
 
-	private static void loadKeyPair() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
+	private static void loadKeyPairs() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
 			IOException, UnrecoverableKeyException {
+		PrivateKey privateKey;
+		PublicKey publicKey;
 
 		KeyStore keyStore = KeyStore.getInstance(KEY_STORE_TYPE);
 		keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
-		PrivateKey privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_BACKOFFICE, KEY_STORE_PASSWORD.toCharArray());
-		PublicKey publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_BACKOFFICE).getPublicKey();
-		keyPair = new KeyPair(publicKey, privateKey);
 
-		System.out.println("Successfully loaded key pair from java key store");
+		// Backoffice key pair
+		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_BACKOFFICE, KEY_STORE_PASSWORD.toCharArray());
+		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_BACKOFFICE).getPublicKey();
+		backofficeKeyPair = new KeyPair(publicKey, privateKey);
+
+		// Account Management key pair
+		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
+		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT).getPublicKey();
+		accountManagementKeyPair = new KeyPair(publicKey, privateKey);
+
+		// Energy Management key pair
+		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ENERGY_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
+		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_ENERGY_MANAGEMENT).getPublicKey();
+		energyManagementKeyPair = new KeyPair(publicKey, privateKey);
+
+		System.out.println("Successfully loaded key pairs from java key store!");
 	}
 
 	private static void generateCompartmentKeys() throws NoSuchAlgorithmException, SQLException, IllegalBlockSizeException,
@@ -135,10 +154,12 @@ public class BackofficeMain {
 		ResultSet rs;
 
 		// Check if keys already exist
-		st = dbConnection.prepareStatement(READ_COMPARTMENT_KEYS_COUNT);
+		st = dbConnection.prepareStatement(READ_COMPARTMENT_KEYS);
 		rs = st.executeQuery();
 
-		if (rs.next() && rs.getInt(1) != 0){
+		if (rs.next()){
+			personalInfoKey = Crypto.unwrapKey(backofficeKeyPair.getPrivate(), rs.getBytes(1));
+			energyPanelKey = Crypto.unwrapKey(backofficeKeyPair.getPrivate(), rs.getBytes(2));
 			st.close();
 			return;
 		}
@@ -150,14 +171,14 @@ public class BackofficeMain {
 		// Generate key for personal info compartment
 		KeyGenerator keyGen = KeyGenerator.getInstance("AES");
 		keyGen.init(128);
-		Key personalInfoKey = keyGen.generateKey();
-		byte[] wrappedPersonalInfoKey = Crypto.wrapKey(keyPair.getPublic(), personalInfoKey);
+		personalInfoKey = keyGen.generateKey();
+		byte[] wrappedPersonalInfoKey = Crypto.wrapKey(backofficeKeyPair.getPublic(), personalInfoKey);
 
 		// Generate key for energy panel compartment
 		keyGen = KeyGenerator.getInstance("AES");
 		keyGen.init(128);
-		Key energyPanelKey = keyGen.generateKey();
-		byte[] wrappedEnergyPanelKey = Crypto.wrapKey(keyPair.getPublic(), energyPanelKey);
+		energyPanelKey = keyGen.generateKey();
+		byte[] wrappedEnergyPanelKey = Crypto.wrapKey(backofficeKeyPair.getPublic(), energyPanelKey);
 
 		// Upload keys to database
 		st = dbConnection.prepareStatement(CREATE_COMPARTMENT_KEYS);
@@ -172,18 +193,18 @@ public class BackofficeMain {
 
 		try {
 			statement = dbConnection.createStatement();
-			statement.execute(DROP_COMPARTMENT_KEYS_TABLE);
-			statement.execute(DROP_ROLE_PERMISSION_TABLE);
+			statement.execute(DROP_PERMISSION_TABLE);
 			statement.execute(DROP_ADMIN_TABLE);
+			statement.execute(DROP_COMPARTMENT_KEYS_TABLE);
+
 
 			statement = dbConnection.createStatement();
 			statement.execute(CREATE_ADMIN_TABLE);
 			statement.execute(CREATE_PERMISSION_TABLE);
 			statement.execute(CREATE_COMPARTMENT_KEYS_TABLE);
 
-			createRolesPermissions();
-
 			generateCompartmentKeys();
+			generatePermissions();
 
 			System.out.println("Database is ready!");
 		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e) {
@@ -192,27 +213,34 @@ public class BackofficeMain {
 		}
 	}
 
-	public static void createRolesPermissions() throws SQLException {
-		createAccountManagerPermissions();
-		createEnergySystemManagerPermissions();
-	}
-
-	public static void createAccountManagerPermissions() throws SQLException {
+	public static void generatePermissions() throws SQLException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
 		PreparedStatement st;
-		st = dbConnection.prepareStatement(CREATE_PERMISSION);
-		st.setString(1, "ACCOUNT_MANAGER");
-		st.setBoolean(2, true);
-		st.setBoolean(3, false);
+		ResultSet rs;
+
+		// Check if permissions already exist
+		st = dbConnection.prepareStatement(READ_PERMISSION_COUNT);
+		rs = st.executeQuery();
+
+		if (rs.next() && rs.getInt(1) != 0){
+			System.out.println("EXITING!! " + rs.getInt(1));
+			st.close();
+			return;
+		}
+		st.close();
+
+		// Account Management
+		st = dbConnection.prepareStatement(CREATE_ACCOUNT_MANAGER_PERMISSION);
+		st.setBoolean(1, true); // personal info
+		st.setBoolean(2, false); // energy panel
+		st.setBytes(3, Crypto.wrapKey(accountManagementKeyPair.getPublic(), personalInfoKey)); // personal info key
 		st.executeUpdate();
 		st.close();
-	}
 
-	public static void createEnergySystemManagerPermissions() throws SQLException {
-		PreparedStatement st;
-		st = dbConnection.prepareStatement(CREATE_PERMISSION);
-		st.setString(1, "ENERGY_SYSTEM_MANAGER");
-		st.setBoolean(2, false);
-		st.setBoolean(3, true);
+		// Energy Management
+		st = dbConnection.prepareStatement(CREATE_ENERGY_MANAGER_PERMISSION);
+		st.setBoolean(1, false); // personal info
+		st.setBoolean(2, true); // energy panel
+		st.setBytes(3, Crypto.wrapKey(energyManagementKeyPair.getPublic(), energyPanelKey)); // energy panel key
 		st.executeUpdate();
 		st.close();
 	}

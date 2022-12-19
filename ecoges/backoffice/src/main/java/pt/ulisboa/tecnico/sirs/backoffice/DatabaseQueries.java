@@ -2,7 +2,7 @@ package pt.ulisboa.tecnico.sirs.backoffice;
 
 public class DatabaseQueries {
     public static final String DROP_ADMIN_TABLE = "DROP TABLE IF EXISTS admin";
-    public static final String DROP_ROLE_PERMISSION_TABLE = "DROP TABLE IF EXISTS permission";
+    public static final String DROP_PERMISSION_TABLE = "DROP TABLE IF EXISTS permission";
 
     public static final String DROP_COMPARTMENT_KEYS_TABLE = "DROP TABLE IF EXISTS compartment_keys";
 
@@ -19,7 +19,7 @@ public class DatabaseQueries {
         "username VARCHAR(150) NOT NULL," +
         "password VARCHAR(150) NOT NULL," +
         "token VARCHAR(64) DEFAULT ''," +
-        "role VARCHAR(25) NOT NULL," + // ACCOUNT_MANAGER, ENERGY_SYSTEM_MANAGER
+        "role VARCHAR(25) NOT NULL," + // ACCOUNT_MANAGER, ENERGY_MANAGER
         "UNIQUE (username)," +
         "PRIMARY KEY (id)) ";
         //"ENGINE=InnoDB ENCRYPTION='Y'";
@@ -30,18 +30,22 @@ public class DatabaseQueries {
                     "role VARCHAR(25) NOT NULL, " +
                     "personal_info BOOLEAN NOT NULL, " +
                     "energy_panel BOOLEAN NOT NULL, " +
+                    "personal_info_key BLOB DEFAULT NULL, " +
+                    "energy_panel_key BLOB DEFAULT NULL, " +
                     "UNIQUE (role), " +
                     "PRIMARY KEY(id)) ";
                     //"ENGINE=InnoDB ENCRYPTION='Y'";
 
     public static final String CREATE_ADMIN = "INSERT INTO admin(username, password, role) VALUES(?, ?, ?)";
-    public static final String CREATE_PERMISSION = "INSERT INTO permission(role, personal_info, energy_panel) VALUES(?, ?, ?)";
+    public static final String CREATE_ACCOUNT_MANAGER_PERMISSION = "INSERT INTO permission(role, personal_info, energy_panel, personal_info_key) VALUES('ACCOUNT_MANAGER', ?, ?, ?)";
+    public static final String CREATE_ENERGY_MANAGER_PERMISSION = "INSERT INTO permission(role, personal_info, energy_panel, energy_panel_key) VALUES('ENERGY_MANAGER', ?, ?, ?)";
 
     public static final String CREATE_COMPARTMENT_KEYS = "INSERT INTO compartment_keys(personal_info_key, energy_panel_key) VALUES(?, ?)";
 
     public static final String READ_COMPARTMENT_KEYS = "SELECT personal_info_key, energy_panel_key FROM compartment_keys";
-
-    public static final String READ_COMPARTMENT_KEYS_COUNT = "SELECT COUNT(*) FROM compartment_keys";
+    public static final String READ_PERSONAL_INFO_KEY_WITH_ROLE = "SELECT personal_info_key FROM permission WHERE role = ?";
+    public static final String READ_ENERGY_PANEL_KEY_WITH_ROLE = "SELECT energy_panel_key FROM permission WHERE role = ?";
+    public static final String READ_PERMISSION_COUNT = "SELECT COUNT(*) FROM permission";
 
     public static final String READ_ADMIN_PASSWORD_ROLE = "SELECT password, role FROM admin WHERE username = ?";
     public static final String READ_ADMIN_ROLE = "SELECT role FROM admin WHERE username = ?";

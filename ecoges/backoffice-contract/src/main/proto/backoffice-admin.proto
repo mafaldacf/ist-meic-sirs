@@ -23,7 +23,7 @@ enum PlanType {
 
 enum RoleType {
 	ACCOUNT_MANAGER = 0;
-	ENERGY_SYSTEM_MANAGER = 1;
+	ENERGY_MANAGER = 1;
 }
 
 message AckResponse {

@@ -1,8 +1,13 @@
 package pt.ulisboa.tecnico.sirs.client;
 
+import pt.ulisboa.tecnico.sirs.crypto.Crypto;
+import pt.ulisboa.tecnico.sirs.crypto.exceptions.WeakPasswordException;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ClientMain {
 	private static String serverHost = "localhost";
@@ -76,8 +81,22 @@ public class ClientMain {
 		name = scanner.nextLine();
 		System.out.print("Enter your email: ");
 		email = scanner.nextLine();
+
+		//System.out.print("Enter your strong password (10 to 30 characters and at least: 1 uppercase, 1 lowercase, 1 digit and 1 special character): ");
+
 		System.out.print("Enter your password: ");
 		password = scanner.nextLine();
+		/* while(true) {
+			try {
+				password = scanner.nextLine();
+				Crypto.verifyStrongPassword(password);
+				break;
+			} catch (WeakPasswordException e) {
+				System.out.println(e.getMessage());
+				System.out.print("Enter your strong password again: ");
+			}
+		} */
+
 		System.out.print("Enter your address: ");
 		address = scanner.nextLine();
 		System.out.print("Enter your bank account IBAN: ");

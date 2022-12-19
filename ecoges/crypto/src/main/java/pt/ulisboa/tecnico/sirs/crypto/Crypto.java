@@ -1,6 +1,7 @@
 package pt.ulisboa.tecnico.sirs.crypto;
 
 import com.google.protobuf.ByteString;
+import pt.ulisboa.tecnico.sirs.crypto.exceptions.WeakPasswordException;
 
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -10,8 +11,31 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Crypto {
+
+    public static boolean verifyStrongPassword(String password) throws WeakPasswordException {
+        String regex = "" +
+                "^" + // start of line
+                "(?=.*[0-9])" + // at least one digit
+                "(?=.*[a-z])" + // at least one lowercase
+                "(?=.*[A-Z])" + // at least one uppercase
+                "(?=.*[!@#&()–[{}]:;',?/*~$^+=<>])" + // at least one special character
+                "." + // matches anything
+                "{10,30}" + // length of 10 to 30 characters
+                "$" + // end of line
+                "";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(password);
+
+        if (!matcher.matches()) {
+            throw new WeakPasswordException();
+        }
+
+        return true;
+    }
 
     public static String hash(String message) throws NoSuchAlgorithmException  {
         final MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -69,9 +93,9 @@ public class Crypto {
         return wrapped;
     }
 
-    public static Key unwrapKey(PublicKey publicKey, byte[] wrappedSecretKey) throws InvalidKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException {
+    public static Key unwrapKey(PrivateKey privateKey, byte[] wrappedSecretKey) throws InvalidKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException {
         Cipher cipher = Cipher.getInstance("RSA/ECB/NoPadding");
-        cipher.init(Cipher.UNWRAP_MODE, publicKey);
+        cipher.init(Cipher.UNWRAP_MODE, privateKey);
         Key secretKey = cipher.unwrap(wrappedSecretKey, "AES", Cipher.SECRET_KEY);
         return secretKey;
     }

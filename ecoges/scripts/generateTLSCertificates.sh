@@ -43,5 +43,11 @@ rm backoffice.csr
 openssl x509 -req -days 365 -in database.csr -CA ca.crt -CAkey ca.key -extfile database-domains.ext -set_serial 01 -out database.crt
 rm database.csr
 
+# Move everything to tlscerts directory
+
+mv *.crt ../tlscerts/
+mv *.pem ../tlscerts/
+mv *.key ../tlscerts/
+
 echo ""
 echo "Done."

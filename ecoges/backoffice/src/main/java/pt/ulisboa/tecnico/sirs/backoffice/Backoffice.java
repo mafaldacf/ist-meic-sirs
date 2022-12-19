@@ -6,7 +6,11 @@ import pt.ulisboa.tecnico.sirs.crypto.Crypto;
 
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.*;
+import java.security.cert.CertificateException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,41 +20,58 @@ import static pt.ulisboa.tecnico.sirs.backoffice.DatabaseQueries.*;
 public class Backoffice {
 
     private final Connection dbConnection;
-    private Key personalInfoKey;
-    private Key energyPanelKey;
-    private String personalInfoKeyString;
-    private String energyPanelKeyString;
+    private final KeyPair backofficeKeyPair;
+    private final KeyPair accountManagementKeyPair;
+    private final KeyPair energyManagementKeyPair;
 
-    private KeyPair keyPair;
+    private static final String KEY_STORE_FILE = "src/main/resources/backoffice.jks";
+    private static final String KEY_STORE_TYPE = "JKS";
+    private static final String KEY_STORE_PASSWORD = "backoffice";
+    private static final String KEY_STORE_ALIAS_WEBSERVER = "webserver";
 
-    public Backoffice(Connection dbConnection, KeyPair keyPair) {
+    public Backoffice(Connection dbConnection, KeyPair backofficeKeyPair, KeyPair accountManagementKeyPair, KeyPair energyManagementKeyPair) {
         this.dbConnection = dbConnection;
-        this.keyPair = keyPair;
+        this.backofficeKeyPair = backofficeKeyPair;
+        this.accountManagementKeyPair = accountManagementKeyPair;
+        this.energyManagementKeyPair = energyManagementKeyPair;
     }
 
-    public void loadCompartmentKeys() throws SQLException, CompartmentKeyException,
-            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+    public KeyPair getRoleKeyPair(String role) throws InvalidRoleException {
+        switch(role) {
+            case "ACCOUNT_MANAGER":
+                return accountManagementKeyPair;
+            case "ENERGY_MANAGER":
+                return energyManagementKeyPair;
+            default:
+                throw new InvalidRoleException(role);
+        }
+    }
+
+    public String getCompartmentKeyString(String role, String query) throws SQLException, CompartmentKeyException,
+            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidRoleException {
 
         PreparedStatement st;
-        byte[] wrappedPersonalInfoKey, wrappedEnergyPanelKey;
+        Key key;
+        byte[] wrappedKey;
         ResultSet rs;
 
-        st = dbConnection.prepareStatement(READ_COMPARTMENT_KEYS);
+        KeyPair roleKeyPair = getRoleKeyPair(role);
+
+        st = dbConnection.prepareStatement(query);
+        st.setString(1, role);
         rs = st.executeQuery();
 
         if (rs.next()){
-            wrappedPersonalInfoKey = rs.getBytes(1);
-            wrappedEnergyPanelKey = rs.getBytes(2);
-            personalInfoKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedPersonalInfoKey);
-            personalInfoKeyString = personalInfoKey.toString();
-            energyPanelKey = Crypto.unwrapKey(keyPair.getPublic(), wrappedEnergyPanelKey);
-            energyPanelKeyString = energyPanelKey.toString();
+            wrappedKey = rs.getBytes(1);
+            key = Crypto.unwrapKey(roleKeyPair.getPrivate(), wrappedKey);
         }
         else {
             st.close();
             throw new CompartmentKeyException();
         }
         st.close();
+
+        return key.toString();
     }
 
     /*
@@ -59,7 +80,43 @@ public class Backoffice {
     -----------------------------------------------
      */
 
-    public List<String> getCompartmentKeys() throws IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+    public List<String> getCompartmentKeys() throws IllegalBlockSizeException, NoSuchPaddingException,
+            NoSuchAlgorithmException, InvalidKeyException, SQLException, CompartmentKeyException, KeyStoreException,
+            IOException, CertificateException {
+
+        PreparedStatement st;
+        byte[] wrappedPersonalInfoKey, wrappedEnergyPanelKey;
+        ResultSet rs;
+        String personalInfoKeyString, energyPanelKeyString;
+
+        // get all compartment keys
+        st = dbConnection.prepareStatement(READ_COMPARTMENT_KEYS);
+        rs = st.executeQuery();
+
+        if (rs.next()){
+            wrappedPersonalInfoKey = rs.getBytes(1);
+            wrappedEnergyPanelKey = rs.getBytes(2);
+
+            Key personalInfoKey = Crypto.unwrapKey(backofficeKeyPair.getPrivate(), wrappedPersonalInfoKey);
+            personalInfoKeyString = personalInfoKey.toString();
+
+            Key energyPanelKey = Crypto.unwrapKey(backofficeKeyPair.getPrivate(), wrappedEnergyPanelKey);
+            energyPanelKeyString = energyPanelKey.toString();
+        }
+        else {
+            st.close();
+            throw new CompartmentKeyException();
+        }
+        st.close();
+
+        // encrypt compartment keys with public key of webserver
+
+        KeyStore keyStore = KeyStore.getInstance(KEY_STORE_TYPE);
+        keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
+
+        // Backoffice key pair
+        PublicKey webserverPublicKey = keyStore.getCertificate(KEY_STORE_ALIAS_WEBSERVER).getPublicKey();
+
         List<String> keys = new ArrayList<>();
         keys.add(personalInfoKeyString);
         keys.add(energyPanelKeyString);
@@ -193,9 +250,6 @@ public class Backoffice {
         st = dbConnection.prepareStatement(UPDATE_ADMIN_TOKEN);
         st.setString(1, "");
         st.setString(2, username);
-
-        int result = st.executeUpdate();
-
         return true;
     }
 
@@ -228,13 +282,17 @@ public class Backoffice {
     }
 
     public PersonalInfo checkPersonalInfo(String username, String email, String hashedToken)
-            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException, InvalidRoleException, PermissionDeniedException {
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException,
+            InvalidRoleException, PermissionDeniedException, CompartmentKeyException, IllegalBlockSizeException,
+            NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+
         PersonalInfo personalInfo;
         PreparedStatement st;
         ResultSet rs;
 
         validateSession(username, hashedToken);
-        verifyPermissions(username, READ_PERMISSION_PERSONAL_INFO);
+        String role = verifyPermissions(username, READ_PERMISSION_PERSONAL_INFO);
+        String personalInfoKeyString = getCompartmentKeyString(role, READ_PERSONAL_INFO_KEY_WITH_ROLE);
 
         // get personal info
         st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
@@ -248,11 +306,8 @@ public class Backoffice {
             String name = rs.getString(1);
             email = rs.getString(2);
             String address = rs.getString(3);
-            System.out.println("address");
             String iban = rs.getString(4);
             String plan = rs.getString(5);
-
-            System.out.println("name: " + name + " email: " + email + "address: " + address + "iban: " + iban + "plan" + plan);
 
             personalInfo = PersonalInfo.newBuilder()
                     .setName(name)
@@ -273,7 +328,10 @@ public class Backoffice {
     }
 
     public EnergyPanel checkEnergyPanel(String username, String email, String hashedToken)
-            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException, InvalidRoleException, PermissionDeniedException {
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException,
+            InvalidRoleException, PermissionDeniedException, CompartmentKeyException, IllegalBlockSizeException,
+            NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+
         EnergyPanel energyPanel;
         List<Appliance> appliances;
         List<SolarPanel> solarPanels;
@@ -281,12 +339,12 @@ public class Backoffice {
         ResultSet rs;
 
         validateSession(username, hashedToken);
-        verifyPermissions(username, READ_PERMISSION_ENERGY_PANEL);
+        String role = verifyPermissions(username, READ_PERMISSION_ENERGY_PANEL);
+        String energyPanelKeyString = getCompartmentKeyString(role, READ_ENERGY_PANEL_KEY_WITH_ROLE);
+        int clientId = getClientId(email);
 
-        int client_id = getClientId(email);
-
-        appliances = getAppliances(client_id);
-        solarPanels = getSolarPanels(client_id);
+        appliances = getAppliances(clientId, energyPanelKeyString);
+        solarPanels = getSolarPanels(clientId, energyPanelKeyString);
 
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
         st.setString(1, energyPanelKeyString);
@@ -369,7 +427,7 @@ public class Backoffice {
         return client_id;
     }
 
-    public List<Appliance> getAppliances(int clientId) throws SQLException {
+    public List<Appliance> getAppliances(int clientId, String energyPanelKeyString) throws SQLException {
         PreparedStatement st;
         ResultSet rs;
         List<Appliance> appliances = new ArrayList<>();
@@ -402,7 +460,7 @@ public class Backoffice {
         return appliances;
     }
 
-    public List<SolarPanel> getSolarPanels(int clientId) throws SQLException {
+    public List<SolarPanel> getSolarPanels(int clientId, String energyPanelKeyString) throws SQLException {
         PreparedStatement st;
         ResultSet rs;
         List<SolarPanel> solarPanels = new ArrayList<>();
@@ -430,7 +488,9 @@ public class Backoffice {
         return solarPanels;
     }
 
-    public void verifyPermissions(String username, String permissionQuery) throws SQLException, AdminDoesNotExistException, InvalidRoleException, PermissionDeniedException {
+    public String verifyPermissions(String username, String query) throws SQLException, AdminDoesNotExistException,
+            InvalidRoleException, PermissionDeniedException {
+
         PreparedStatement st;
         ResultSet rs;
         String role;
@@ -448,7 +508,7 @@ public class Backoffice {
 
         st.close();
 
-        st = dbConnection.prepareStatement(permissionQuery);
+        st = dbConnection.prepareStatement(query);
         st.setString(1, role);
         rs = st.executeQuery();
 
@@ -466,6 +526,7 @@ public class Backoffice {
         }
 
         st.close();
+        return role;
     }
 
 }
