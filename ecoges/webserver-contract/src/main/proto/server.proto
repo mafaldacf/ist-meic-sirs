@@ -8,11 +8,14 @@ option java_multiple_files = true;
 
 service ServerService {
 	rpc register(RegisterRequest) returns (AckResponse);
+	rpc registerBindMobile(RegisterBindMobileRequest) returns (AckResponse);
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);
 	rpc registerMobile(RegisterMobileRequest) returns (RegisterMobileResponse);
+	//TODO: desenvolver os 3 protocolos, tanto aqui como no mobile
 	//rpc logoutMobile(LogoutMobileRequest) returns (LogoutMobileResponse);
 	//rpc tokenMobile(TokenMobileRequest) returns (TokenMobileResponse);
+	// token tem que ser enviado na request
 	//rpc twoFactorMobile(TwoFactorMobileRequest) returns (TwoFactorMobileResponse);
 	rpc addAppliance(AddEquipmentRequest) returns (AckResponse);
 	rpc addSolarPanel(AddEquipmentRequest) returns (AckResponse);
@@ -40,6 +43,13 @@ message RegisterRequest {
 	string address = 4;
 	string IBAN = 5;
 	PlanType plan = 6;
+}
+
+// Bind mobile on register
+
+message RegisterBindMobileRequest {
+	string token = 1;
+	string name = 2;
 }
 
 // Login
@@ -72,6 +82,8 @@ message RegisterMobileResponse {
 	string name = 1;
 	string hashedToken = 2;
 }
+
+
 
 // Logout Mobile
 /*

@@ -13,6 +13,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.mysql.cj.exceptions.StreamingNotifiable;
+
 public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBase {
 	private static Webserver server;
 
@@ -24,6 +26,8 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 	public void register(RegisterRequest request, StreamObserver<AckResponse> responseObserver) {
 		AckResponse.Builder builder = AckResponse.newBuilder();
 		try {
+
+			// TODO: Asking for mobile token
 			server.register(request.getName(), request.getEmail(), request.getPassword(), request.getAddress(), request.getIBAN(), request.getPlan().name());
 
 			builder.setAck(true);
@@ -36,6 +40,21 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onError(Status.ALREADY_EXISTS.withDescription(e.getMessage()).asRuntimeException());
 		} catch (NoSuchAlgorithmException e) {
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		}
+	}
+
+	@Override
+	public void registerBindMobile(RegisterBindMobileRequest request, StreamObserver<AckResponse> responseObserver){
+		AckResponse.Builder builder = AckResponse.newBuilder();
+		try {
+
+			// TODO: Registering process 
+			builder.setAck(true);
+
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (Exception e) {
+			// TODO: handle exception
 		}
 	}
 

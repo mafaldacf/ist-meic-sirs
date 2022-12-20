@@ -45,6 +45,20 @@ public class Client {
 		return false;
 	}
 
+	public static boolean registerBindMobile(String token, String name){
+		try {
+			RegisterBindMobileRequest request = RegisterBindMobileRequest.newBuilder()
+					.setToken(token)
+					.setName(name)
+					.build();
+			AckResponse response = server.registerBindMobile(request);
+			return(response.getAck());
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
+		return false;
+	}
+
 	public static ArrayList<String> login(String email, String password) {
 		try {
 			LoginRequest request = LoginRequest.newBuilder().setEmail(email).setPassword(password).build();
