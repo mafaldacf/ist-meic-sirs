@@ -83,7 +83,14 @@ message RegisterMobileResponse {
 	string hashedToken = 2;
 }
 
+message twoFactorMobileRequest {
+	string username = 1;
+	string token = 2;
+}
 
+message twoFactorMobileResponse {
+	string 2FAkey = 1;
+}
 
 // Logout Mobile
 /*

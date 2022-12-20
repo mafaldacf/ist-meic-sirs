@@ -27,14 +27,25 @@ public class Mobile {
 		channel.shutdown();
 	}
 
-	public static ArrayList<String> login(String email, String password) {
+	public static String registerMobile(String email, String password) {
 		try {
 			RegisterMobileRequest request = RegisterMobileRequest.newBuilder().setEmail(email).setPassword(password).build();
 			RegisterMobileResponse response = server.registerMobile(request);
-			ArrayList<String> cred = new ArrayList<>();
-			cred.add(response.getName());
-			cred.add(response.getHashedToken());
+			String cred = response.getToken();
 			return cred;
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
+		return null;
+	}
+
+	//TODO: Desenvolver method to factor e deppis no MobileMain.java a interface na consola
+	public static string twoFactorMobile(String username, String token) {
+		try {
+			twoFactorMobileRequest request = twoFactorMobileRequest.newBuilder().setUsername(username).setToken(token).build();
+			twoFactorMobileResponse response = server.twoFactorMobile(request);
+			String 2FAkey = response.get2FAkey();
+			return 2FAkey;
 		} catch (StatusRuntimeException e) {
 			System.out.println(e.getMessage());
 		}
