@@ -11,6 +11,8 @@ public class MobileMain {
 	private static String hashedToken = null;
 	private static String name = null;
 	private static String email = null;
+	private static String token = null;
+	private static String twoFAkey = null;
 
 	// Usage: [<serverHost>] [<serverPort>]
 	public static void main(String[] args) {
@@ -34,26 +36,6 @@ public class MobileMain {
 			showInterface();
 		} catch (IOException e) {
 			System.out.println("Could not start client. Invalid webserver certificate.");
-		}
-	}
-
-	
-
-	public static void login(){
-		String password;
-		Scanner scanner = new Scanner(System.in);
-
-		System.out.print("Enter your email: ");
-		email = scanner.nextLine();
-		System.out.print("Enter your password: ");
-		password = scanner.nextLine();
-
-		ArrayList<String> response = Mobile.login(email, password);
-		if (response != null) {
-			name = response.get(0);
-			hashedToken = response.get(1);
-			System.out.println("Login successful.");
-			showMenu();
 		}
 	}
 
@@ -83,8 +65,39 @@ public class MobileMain {
 		}
 	}
 
-	public static void authorize_2FA(){
+	public static void login(){
+		String password;
+		Scanner scanner = new Scanner(System.in);
 
+		System.out.print("Enter your email: ");
+		email = scanner.nextLine();
+		System.out.print("Enter your password: ");
+		password = scanner.nextLine();
+
+		String response = Mobile.registerMobile(email, password);
+		if (response != null) {
+			token = response;
+			System.out.println("Login successful.");
+			showMenu();
+		}
+	}
+
+	//Validar se o 2FA recebido é igual
+	public static void authorize_2FA(){
+		String username;
+		Scanner scanner = new Scanner(System.in);
+
+		System.out.print("Enter your username: ");
+		username = scanner.nextLine(); 
+		System.out.print("Enter your token: ");
+		token = scanner.nextLine();
+
+		String response = Mobile.twoFactorMobile(username, token);
+		if (response != null) {
+			twoFAkey = response;
+			System.out.println("Authorization successful.");
+			showMenu();
+		}
 	}
 
 	public static void showMenu() {
@@ -112,7 +125,6 @@ public class MobileMain {
 					return;
 				default:
 					System.out.println("Invalid command.");
-
 			}
 		}
 	}

@@ -14,9 +14,7 @@ service ServerService {
 	rpc registerMobile(RegisterMobileRequest) returns (RegisterMobileResponse);
 	//TODO: desenvolver os 3 protocolos, tanto aqui como no mobile
 	//rpc logoutMobile(LogoutMobileRequest) returns (LogoutMobileResponse);
-	//rpc tokenMobile(TokenMobileRequest) returns (TokenMobileResponse);
-	// token tem que ser enviado na request
-	//rpc twoFactorMobile(TwoFactorMobileRequest) returns (TwoFactorMobileResponse);
+	rpc twoFactorMobile(TwoFactorMobileRequest) returns (TwoFactorMobileResponse);
 	rpc addAppliance(AddEquipmentRequest) returns (AckResponse);
 	rpc addSolarPanel(AddEquipmentRequest) returns (AckResponse);
 	rpc checkPersonalInfo(CheckPersonalInfoRequest) returns (CheckPersonalInfoResponse);
@@ -71,7 +69,7 @@ message LogoutRequest {
 	string hashedToken = 2;
 }
 
-// Login Mobile
+// Register Mobile
 
 message RegisterMobileRequest {
 	string email = 1;
@@ -79,17 +77,16 @@ message RegisterMobileRequest {
 }
 
 message RegisterMobileResponse {
-	string name = 1;
-	string hashedToken = 2;
+	string token = 1;
 }
 
-message twoFactorMobileRequest {
+message TwoFactorMobileRequest {
 	string username = 1;
 	string token = 2;
 }
 
-message twoFactorMobileResponse {
-	string 2FAkey = 1;
+message TwoFactorMobileResponse {
+	string twoFAkey = 1;
 }
 
 // Logout Mobile

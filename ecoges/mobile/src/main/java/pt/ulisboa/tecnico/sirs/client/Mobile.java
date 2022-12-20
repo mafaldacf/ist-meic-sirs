@@ -29,7 +29,8 @@ public class Mobile {
 
 	public static String registerMobile(String email, String password) {
 		try {
-			RegisterMobileRequest request = RegisterMobileRequest.newBuilder().setEmail(email).setPassword(password).build();
+			RegisterMobileRequest request = RegisterMobileRequest.newBuilder()
+				.setEmail(email).setPassword(password).build();
 			RegisterMobileResponse response = server.registerMobile(request);
 			String cred = response.getToken();
 			return cred;
@@ -40,12 +41,13 @@ public class Mobile {
 	}
 
 	//TODO: Desenvolver method to factor e deppis no MobileMain.java a interface na consola
-	public static string twoFactorMobile(String username, String token) {
+	public static String twoFactorMobile(String username, String token) {
 		try {
-			twoFactorMobileRequest request = twoFactorMobileRequest.newBuilder().setUsername(username).setToken(token).build();
-			twoFactorMobileResponse response = server.twoFactorMobile(request);
-			String 2FAkey = response.get2FAkey();
-			return 2FAkey;
+			TwoFactorMobileRequest request = TwoFactorMobileRequest.newBuilder()
+				.setUsername(username).setToken(token).build();
+			TwoFactorMobileResponse response = server.twoFactorMobile(request);
+			String twoFAkey = response.getTwoFAkey();
+			return twoFAkey;
 		} catch (StatusRuntimeException e) {
 			System.out.println(e.getMessage());
 		}
