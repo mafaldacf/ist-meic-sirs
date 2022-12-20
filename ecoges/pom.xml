@@ -43,6 +43,7 @@
 		<module>backoffice-contract</module>
 		<module>backoffice</module>
 		<module>client</module>
+		<module>mobile</module>
 		<module>admin</module>
     </modules>
 

@@ -6,6 +6,8 @@ public class DatabaseQueries {
     public static final String DROP_APPLIANCE_TABLE = "DROP TABLE IF EXISTS appliance";
     public static final String DROP_SOLAR_PANEL_TABLE = "DROP TABLE IF EXISTS solarpanel";
     public static final String DROP_INVOICE_TABLE = "DROP TABLE IF EXISTS invoice";
+    public static final String DROP_MOBILE_TABLE = "DROP TABLE IF EXISTS mobile";
+
 
     public static final String CREATE_CLIENT_TABLE =
         "CREATE TABLE client (" +
@@ -69,6 +71,14 @@ public class DatabaseQueries {
                 "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)";
         //"ENGINE=InnoDB ENCRYPTION='Y'";
 
+    public static final String CREATE_MOBILE_TABLE =
+        "CREATE TABLE mobile (" + 
+                "id INTEGER NOT NULL AUTO_INCREMENT, " + 
+                "token VARCHAR(64) DEFAULT '', " +
+                "client_id INTEGER NOT NULL, " + 
+                "PRIMARY KEY(id), " +
+                "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)";
+
     public static final String CREATE_CLIENT =
             "INSERT INTO client(name, email, address, password, iban, plan, salt) " +
                     "VALUES(?, ?, ?, ?, ?, ?, ?)";
@@ -79,6 +89,10 @@ public class DatabaseQueries {
     public static final String CREATE_INVOICE =
             "INSERT INTO invoice(client_id, year, month, paymentAmount, energyConsumed, energyConsumedDaytime, energyConsumedNight, plan, taxes) " +
                     "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    public static final String CREATE_MOBILE = "INSERT INTO mobile(token, client_id) " +
+                    "VALUES(?, ?)";
+                    
+                    
     public static final String READ_CLIENT_NAME_PASSWORD_SALT = "SELECT name, password, salt FROM client WHERE email = ?";
 
     public static final String READ_CLIENT_ID = "SELECT id FROM client WHERE email = ?";
@@ -86,6 +100,9 @@ public class DatabaseQueries {
     public static final String READ_CLIENT_PERSONAL_INFO = "SELECT name, email, address, iban, plan FROM client WHERE email = ?";
 
     public static final String READ_CLIENT_ENERGY_CONSUMPTION_PRODUCTION = "SELECT energyConsumed, energyConsumedDaytime, energyConsumedNight, energyProduced FROM client WHERE email= ? ";
+
+    public static final String READ_CLIENT_MOBILE_TOKEN = "SELECT token FROM mobile INNER JOIN client ON mobile.client_id = client.id WHERE mobile.client_id = ?";
+
     public static final String READ_INVOICES = "SELECT year, month, paymentAmount, energyConsumed, energyConsumedDaytime, energyConsumedNight, plan, taxes FROM invoice WHERE client_id = ? " +
             "ORDER BY year, month";
 
@@ -102,6 +119,8 @@ public class DatabaseQueries {
 
     public static final String READ_APPLIANCES = "SELECT name, brand, energyConsumed, energyConsumedDaytime, energyConsumedNight FROM appliance WHERE client_id = ? ";
     public static final String READ_SOLAR_PANELS = "SELECT name, brand, energyProduced FROM solarpanel WHERE client_id = ? ";
+
+
 
     public static final String UPDATE_CLIENT_ENERGY_CONSUMPTION = "UPDATE client SET energyConsumed = ?, energyConsumedDaytime = ?, energyConsumedNight = ? WHERE email = ?";
     public static final String UPDATE_CLIENT_ENERGY_PRODUCTION = "UPDATE client SET energyProduced = ? WHERE email = ?";

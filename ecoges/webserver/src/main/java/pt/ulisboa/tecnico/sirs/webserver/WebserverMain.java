@@ -114,12 +114,16 @@ public class WebserverMain {
 			statement.execute(DROP_SOLAR_PANEL_TABLE);
 			statement.execute(DROP_APPLIANCE_TABLE);
 			statement.execute(DROP_CLIENT_TABLE);
+			statement.execute(DROP_MOBILE_TABLE);
+
 
 			statement = dbConnection.createStatement();
 			statement.execute(CREATE_CLIENT_TABLE);
 			statement.execute(CREATE_APPLIANCE_TABLE);
 			statement.execute(CREATE_SOLAR_PANEL_TABLE);
 			statement.execute(CREATE_INVOICE_TABLE);
+			statement.execute(CREATE_MOBILE_TABLE);
+
 
 			System.out.println("Database is ready!");
 		} catch (SQLException e) {

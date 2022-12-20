@@ -177,6 +177,13 @@ Append the following content to `/etc/mysql/my.cnf` file:
         ssl-cert=/etc/mysql/tlscerts/database.crt
         ssl-key=/etc/mysql/tlscerts/database.key
 
+Change necessary permissions on copied files:
+
+    sudo chmod 777 /etc/mysql/tlscerts/ca.crt
+    sudo chmod 777 /etc/mysql/tlscerts/database.crt
+    sudo chmod 777 /etc/mysql/tlscerts/database.key
+
+
 Verify if everything is ok, having the following field values: `have_openssl` = `YES`:
 
     sudo service mysql restart
