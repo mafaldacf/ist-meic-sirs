@@ -86,15 +86,8 @@ public class ClientMain {
 		int plan = getPlan();
 
 		if (plan != -1 && Client.register(name, email, password, address, iban, plan)) {
-			System.out.print("Please Insert Your Mobile Token: ");
-			token = scanner.nextLine();
-			if(Client.registerBindMobile(token, name)){
-				System.out.println("Registered user " + name + " with email " + email + ".");
-			} else {
-				System.out.println("Could not register in the system. The token provided is not valid." +
-				"\nPlease try again.");
-
-			}
+			System.out.println("Registered user " + name + " with email " + email + ".");
+			System.out.println("To access all the important functionalities, please enable 2FA.");
 		}
 		else{
 			System.out.println("Could not register in the system. Please try again.");

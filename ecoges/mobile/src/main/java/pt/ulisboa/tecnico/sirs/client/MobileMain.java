@@ -79,7 +79,7 @@ public class MobileMain {
 		String response = Mobile.registerMobile(email, password);
 		if (response != null) {
 			token = response;
-			System.out.println("Login successful.");
+			System.out.println("Login successful. Here is your token: " + token);
 			showMenu();
 		}
 	}

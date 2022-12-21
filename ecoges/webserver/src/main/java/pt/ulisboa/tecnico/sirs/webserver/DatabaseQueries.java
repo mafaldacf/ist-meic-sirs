@@ -74,8 +74,8 @@ public class DatabaseQueries {
     public static final String CREATE_MOBILE_TABLE =
         "CREATE TABLE mobile (" + 
                 "id INTEGER NOT NULL AUTO_INCREMENT, " + 
-                "token VARCHAR(64) DEFAULT '', " +
                 "client_id INTEGER NOT NULL, " +
+                "register_token VARCHAR(64) DEFAULT '', " +
                 "salt BLOB, " +
                 "PRIMARY KEY(id), " +
                 "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)";
@@ -90,7 +90,7 @@ public class DatabaseQueries {
     public static final String CREATE_INVOICE =
             "INSERT INTO invoice(client_id, year, month, paymentAmount, energyConsumed, energyConsumedDaytime, energyConsumedNight, plan, taxes) " +
                     "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    public static final String CREATE_MOBILE = "INSERT INTO mobile(token, client_id, salt) " +
+    public static final String CREATE_MOBILE = "INSERT INTO mobile(register_token, client_id, salt) " +
                     "VALUES(?, ?, ?)";
                     
                     
@@ -123,10 +123,10 @@ public class DatabaseQueries {
     public static final String READ_APPLIANCES = "SELECT name, brand, energyConsumed, energyConsumedDaytime, energyConsumedNight FROM appliance WHERE client_id = ? ";
     public static final String READ_SOLAR_PANELS = "SELECT name, brand, energyProduced FROM solarpanel WHERE client_id = ? ";
 
-    public static final String READ_MOBILE_TOKEN_SALT = "SELECT token, salt FROM mobile WHERE client_id = ? ";
+    public static final String READ_MOBILE_TOKEN_SALT = "SELECT register_token, salt FROM mobile WHERE client_id = ? ";
 
-    public static final String READ_MOBILE_TOKEN_WITH_EMAIL = "SELECT token FROM mobile INNER JOIN client ON mobile.client_id = client.id WHERE client.email = ?";
-    public static final String READ_MOBILE_TOKEN_WITH_NAME = "SELECT token FROM mobile INNER JOIN client ON mobile.client_id = client.id WHERE client.name = ?";
+    public static final String READ_MOBILE_TOKEN_WITH_EMAIL = "SELECT register_token FROM mobile INNER JOIN client ON mobile.client_id = client.id WHERE client.email = ?";
+    public static final String READ_MOBILE_TOKEN_WITH_NAME = "SELECT register_token FROM mobile JOIN client ON mobile.client_id = client.id WHERE client.name = ?";
 
 
 

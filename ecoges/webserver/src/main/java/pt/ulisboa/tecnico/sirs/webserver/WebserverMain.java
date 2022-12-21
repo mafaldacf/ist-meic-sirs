@@ -101,6 +101,7 @@ public class WebserverMain {
 		} catch (ClassNotFoundException e) {
 			System.out.println("ERROR: Database class not found.");
 		} finally {
+			System.out.print("SOmething happened");
 			System.exit(1);
 		}
 	}
@@ -113,8 +114,9 @@ public class WebserverMain {
 			statement.execute(DROP_INVOICE_TABLE);
 			statement.execute(DROP_SOLAR_PANEL_TABLE);
 			statement.execute(DROP_APPLIANCE_TABLE);
-			statement.execute(DROP_CLIENT_TABLE);
 			statement.execute(DROP_MOBILE_TABLE);
+			statement.execute(DROP_CLIENT_TABLE);
+			
 
 
 			statement = dbConnection.createStatement();

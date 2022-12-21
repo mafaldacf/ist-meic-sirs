@@ -188,9 +188,12 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException | No2FAException e){
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		} catch (No2FAException e){
+			responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());
 		}
+
 	}
 
 	@Override
