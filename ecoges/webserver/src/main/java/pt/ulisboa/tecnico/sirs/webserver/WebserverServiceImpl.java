@@ -26,8 +26,6 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 	public void register(RegisterRequest request, StreamObserver<AckResponse> responseObserver) {
 		AckResponse.Builder builder = AckResponse.newBuilder();
 		try {
-
-			// TODO: Asking for mobile token
 			server.register(request.getName(), request.getEmail(), request.getPassword(), request.getAddress(), request.getIBAN(), request.getPlan().name());
 
 			builder.setAck(true);
@@ -43,20 +41,7 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 		}
 	}
 
-	@Override
-	public void registerBindMobile(RegisterBindMobileRequest request, StreamObserver<AckResponse> responseObserver){
-		AckResponse.Builder builder = AckResponse.newBuilder();
-		try {
 
-			// TODO: Registering process 
-			builder.setAck(true);
-
-			responseObserver.onNext(builder.build());
-			responseObserver.onCompleted();
-		} catch (Exception e) {
-			// TODO: handle exception
-		}
-	}
 
 	@Override
 	public void login(LoginRequest request, StreamObserver<LoginResponse> responseObserver) {
@@ -82,13 +67,29 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 		try {
 			server.logout(request.getEmail(), request.getHashedToken());
 
-		} catch (SQLException | ClientDoesNotExistException | InvalidSessionTokenException e){
+		} catch (SQLException | ClientDoesNotExistException | InvalidSessionTokenException | No2FAException e){
 			// do nothing, client should be able to logout
 		}
 
 		builder.setAck(true);
 		responseObserver.onNext(builder.build());
 		responseObserver.onCompleted();
+	}
+
+	@Override
+	public void registerMobile(RegisterMobileRequest request, StreamObserver<RegisterMobileResponse> responseObserver){
+		RegisterMobileResponse.Builder builder = RegisterMobileResponse.newBuilder();
+		try {
+			String response = server.registerMobile(request.getEmail(), request.getPassword());
+			builder.setToken(response);
+
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (SQLException e){
+			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+		} catch (ClientDoesNotExistException | WrongPasswordException | NoSuchAlgorithmException | UserAlreadyHasMobileException e){
+			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		}
 	}
 
 	@Override
@@ -103,7 +104,7 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (ApplianceAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (ApplianceAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException | No2FAException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -120,7 +121,7 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (SolarPanelAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (SolarPanelAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException | No2FAException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -137,7 +138,7 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException | No2FAException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -154,7 +155,7 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException | No2FAException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -171,7 +172,7 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException | No2FAException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -187,7 +188,7 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException | No2FAException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
@@ -203,7 +204,7 @@ public class WebserverServiceImpl extends ServerServiceGrpc.ServerServiceImplBas
 			responseObserver.onCompleted();
 		} catch (SQLException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
+		} catch (InvalidSessionTokenException | ClientDoesNotExistException | No2FAException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}

@@ -48,7 +48,7 @@ public class Webserver {
     }
 
     public void validateSession(String email, String hashedToken)
-            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException, No2FAException {
         PreparedStatement st;
         ResultSet rs;
 
@@ -71,6 +71,15 @@ public class Webserver {
                 throw new InvalidSessionTokenException();
         }
         st.close();
+
+        // Check if user has 2FA set up, if not, no actions can be made
+        st = dbConnection.prepareStatement(READ_MOBILE_TOKEN_WITH_EMAIL);
+        st.setString(1, email);
+        rs = st.executeQuery();
+        if(!rs.next() || rs.getString(1).equals("")){
+            throw new No2FAException();
+        }
+        st.close();
     }
 
     /*
@@ -78,6 +87,8 @@ public class Webserver {
     --------------- CLIENT FUNCTIONALITIES ---------------
     ------------------------------------------------------
      */
+    
+
 
     public void register(String name, String email, String password, String address, String iban, String plan) throws SQLException, ClientAlreadyExistsException, NoSuchAlgorithmException {
         PreparedStatement st;
@@ -150,7 +161,7 @@ public class Webserver {
     }
 
     public void logout(String email, String hashedToken)
-            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException, No2FAException {
         PreparedStatement st;
 
         validateSession(email, hashedToken);
@@ -162,8 +173,59 @@ public class Webserver {
         st.executeUpdate();
     }
 
+    public String registerMobile(String email, String password) throws SQLException, ClientDoesNotExistException, WrongPasswordException ,NoSuchAlgorithmException, UserAlreadyHasMobileException {
+        PreparedStatement st;
+        ResultSet rs;
+        int id;
+
+        st = dbConnection.prepareStatement(READ_CLIENT_ID_PASSWORD_SALT);
+        st.setString(1, email);
+
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            id = rs.getInt(1);
+            String dbHashedPassword = rs.getString(2);
+            byte[] salt = rs.getBytes(3);
+            String hashedPassword = Crypto.hashWithSalt(password, salt);
+            if (!hashedPassword.equals(dbHashedPassword)) {
+                st.close();
+                throw new WrongPasswordException();
+            }
+        }
+        else {
+            st.close();
+            throw new ClientDoesNotExistException(email);
+        }
+        st.close();
+
+        st = dbConnection.prepareStatement(READ_MOBILE_TOKEN_SALT);
+        st.setInt(1, id);
+
+        rs = st.executeQuery();
+
+        if(rs.next()){
+            throw new UserAlreadyHasMobileException();
+        }
+        st.close();
+
+        byte[] salt = Crypto.generateSalt();
+        String token = Crypto.generateToken();
+        String hashedToken = Crypto.hashWithSalt(token, salt);
+
+        st = dbConnection.prepareStatement(CREATE_MOBILE); 
+
+        st.setString(1, hashedToken);
+        st.setInt(2, id);
+        st.setBytes(3, salt);
+        st.executeUpdate();
+        st.close();
+
+        return token;
+    }
+
     public void addApplicance(String email, String applianceName, String applianceBrand, String hashedToken)
-            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, ApplianceAlreadyExistsException {
+            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, ApplianceAlreadyExistsException, No2FAException {
 
         PreparedStatement st;
         ResultSet rs;
@@ -206,7 +268,7 @@ public class Webserver {
     }
 
     public void addSolarPanel(String email, String solarPanelName, String solarPanelBrand, String hashedToken)
-            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, SolarPanelAlreadyExistsException {
+            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, SolarPanelAlreadyExistsException, No2FAException {
         PreparedStatement st;
         ResultSet rs;
 
@@ -242,7 +304,7 @@ public class Webserver {
     }
 
     public PersonalInfo checkPersonalInfo(String clientEmail, String hashedToken)
-            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException {
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, No2FAException {
         PersonalInfo personalInfo;
         PreparedStatement st;
         ResultSet rs;
@@ -253,6 +315,7 @@ public class Webserver {
         st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
         st.setString(1, clientEmail);
         rs = st.executeQuery();
+        
 
         if (rs.next()) {
             String name = rs.getString(1);
@@ -268,19 +331,20 @@ public class Webserver {
                     .setIBAN(iban)
                     .setPlan(PlanType.valueOf(plan))
                     .build();
+            st.close();
         }
         else {
             st.close();
             throw new ClientDoesNotExistException(clientEmail);
         }
 
-        st.close();
+        
 
         return personalInfo;
     }
 
     public EnergyPanel checkEnergyPanel(String email, String hashedToken)
-            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException {
+            throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, No2FAException {
         EnergyPanel energyPanel;
         List<Appliance> appliances;
         List<SolarPanel> solarPanels;
@@ -323,7 +387,7 @@ public class Webserver {
     }
 
     public List<Invoice> checkInvoices(String email, String hashedToken)
-            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException {
+            throws SQLException, InvalidSessionTokenException, ClientDoesNotExistException, No2FAException {
         PreparedStatement st;
         ResultSet rs;
         List<Invoice> invoices = new ArrayList<>();
@@ -364,7 +428,7 @@ public class Webserver {
     }
 
     public void updateAddress(String email, String address, String hashedToken)
-            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException, No2FAException {
         PreparedStatement st;
 
         validateSession(email, hashedToken);
@@ -378,7 +442,7 @@ public class Webserver {
     }
 
     public void updatePlan(String email, String plan, String hashedToken)
-            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException {
+            throws SQLException, ClientDoesNotExistException, InvalidSessionTokenException, No2FAException {
 
         validateSession(email, hashedToken);
 
