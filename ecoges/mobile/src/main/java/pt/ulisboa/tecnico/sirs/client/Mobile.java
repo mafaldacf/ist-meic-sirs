@@ -53,5 +53,17 @@ public class Mobile {
 		}
 		return null;
 	}
+
+	public static boolean logoutMobile(String email, String token) {
+		try {
+			LogoutMobileRequest request = LogoutMobileRequest.newBuilder()
+					.setEmail(email).setToken(token).build();
+			AckResponse response = server.logoutMobile(request);
+			return response.getAck();
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
+		return false;
+	}
 }
 

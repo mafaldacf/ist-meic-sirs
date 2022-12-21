@@ -11,6 +11,8 @@ public class MobileMain {
 	private static String hashedToken = null;
 	private static String name = null;
 	private static String email = null;
+
+	private static String username = null;
 	private static String token = null;
 	private static String twoFAkey = null;
 
@@ -84,7 +86,6 @@ public class MobileMain {
 
 	//Validar se o 2FA recebido é igual
 	public static void authorize_2FA(){
-		String username;
 		Scanner scanner = new Scanner(System.in);
 
 		System.out.print("Enter your username: ");
@@ -102,12 +103,13 @@ public class MobileMain {
 
 	public static void showMenu() {
 		String input;
+		boolean success;
 		Scanner scanner = new Scanner(System.in);
 		while(true) {
 			System.out.println("\nPlease select one option:\n" +
 					"1. Authorize Action\n" +
 					"2. Ping\n" +
-					"0. Exit");
+					"0. Logout");
 			System.out.print("> ");
 
 			input = scanner.nextLine();
@@ -119,10 +121,11 @@ public class MobileMain {
 					System.out.println("Pong!");
 					continue;
 				case "0":
-					scanner.close();
-					Mobile.close();
-					System.out.println("Exiting...");
-					return;
+					success = Mobile.logoutMobile(email, token);
+					if (success) {
+						System.out.println("Logged out.");
+						return;
+					}
 				default:
 					System.out.println("Invalid command.");
 			}

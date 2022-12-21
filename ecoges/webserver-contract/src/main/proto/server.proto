@@ -12,8 +12,7 @@ service ServerService {
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);
 	rpc registerMobile(RegisterMobileRequest) returns (RegisterMobileResponse);
-	//TODO: desenvolver os 3 protocolos, tanto aqui como no mobile
-	//rpc logoutMobile(LogoutMobileRequest) returns (LogoutMobileResponse);
+	rpc logoutMobile(LogoutMobileRequest) returns (AckResponse);
 	rpc twoFactorMobile(TwoFactorMobileRequest) returns (TwoFactorMobileResponse);
 	rpc addAppliance(AddEquipmentRequest) returns (AckResponse);
 	rpc addSolarPanel(AddEquipmentRequest) returns (AckResponse);
@@ -90,11 +89,11 @@ message TwoFactorMobileResponse {
 }
 
 // Logout Mobile
-/*
+
 message LogoutMobileRequest {
 	string email = 1;
-	string hashedToken = 2;
-}*/
+	string token = 2;
+}
 
 // Add appliance or solar panel
 
