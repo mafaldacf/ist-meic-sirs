@@ -84,7 +84,7 @@ public class MobileMain {
 		String response = Mobile.registerMobile(email, password);
 		if (response != null) {
 			token = response;
-			System.out.println("Registration successful. Here is your token: " + token);
+			System.out.println("Registration successful.");
 			showMenu();
 		}
 	}
