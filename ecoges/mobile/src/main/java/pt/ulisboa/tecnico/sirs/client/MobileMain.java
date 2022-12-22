@@ -46,13 +46,17 @@ public class MobileMain {
 		Scanner scanner = new Scanner(System.in);
 		while(true) {
 			System.out.println("\nPlease select one option:\n" +
-					"1. Login\n" +
+					"1. Register\n" +
+					"2. Login\n" +
 					"0. Exit");
 			System.out.print("> ");
 
 			input = scanner.nextLine();
 			switch(input) {
 				case "1":
+					register();
+					continue;
+				case "2":
 					login();
 					continue;
 				case "0":
@@ -67,7 +71,7 @@ public class MobileMain {
 		}
 	}
 
-	public static void login(){
+	public static void register(){
 		String password;
 		Scanner scanner = new Scanner(System.in);
 
@@ -76,10 +80,29 @@ public class MobileMain {
 		System.out.print("Enter your password: ");
 		password = scanner.nextLine();
 
+		
 		String response = Mobile.registerMobile(email, password);
 		if (response != null) {
 			token = response;
-			System.out.println("Login successful. Here is your token: " + token);
+			System.out.println("Registration successful. Here is your token: " + token);
+			showMenu();
+		}
+	}
+
+	public static void login() {
+		String password;
+		Scanner scanner = new Scanner(System.in);
+
+		System.out.print("Enter your email: ");
+		email = scanner.nextLine();
+		System.out.print("Enter your password: ");
+		password = scanner.nextLine();
+
+		ArrayList<String> response = Mobile.loginMobile(email, password);
+		if (response != null) {
+			name = response.get(0);
+			token = response.get(1);
+			System.out.println("Login successful.");
 			showMenu();
 		}
 	}

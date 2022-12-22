@@ -1,4 +1,5 @@
 package pt.ulisboa.tecnico.sirs.mobile;
+
 import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.GrpcSslContexts;
@@ -40,7 +41,21 @@ public class Mobile {
 		return null;
 	}
 
-	//TODO: Desenvolver method to factor e deppis no MobileMain.java a interface na consola
+	public static ArrayList<String> loginMobile(String email, String password) {
+		try {
+			LoginMobileRequest request = LoginMobileRequest.newBuilder()
+				.setEmail(email).setPassword(password).build();
+			LoginMobileResponse response = server.loginMobile(request);
+			ArrayList<String> cred = new ArrayList<>();
+			cred.add(response.getName());
+			cred.add(response.getToken());
+			return cred;
+		} catch (StatusRuntimeException e) {
+			System.out.println(e.getMessage());
+		}
+		return null;
+	}
+
 	public static String twoFactorMobile(String username, String token) {
 		try {
 			TwoFactorMobileRequest request = TwoFactorMobileRequest.newBuilder()

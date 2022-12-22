@@ -12,6 +12,7 @@ service ServerService {
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);
 	rpc registerMobile(RegisterMobileRequest) returns (RegisterMobileResponse);
+	rpc loginMobile(LoginMobileRequest) returns (LoginMobileResponse);
 	rpc logoutMobile(LogoutMobileRequest) returns (AckResponse);
 	rpc twoFactorMobile(TwoFactorMobileRequest) returns (TwoFactorMobileResponse);
 	rpc addAppliance(AddEquipmentRequest) returns (AckResponse);
@@ -86,6 +87,18 @@ message TwoFactorMobileRequest {
 
 message TwoFactorMobileResponse {
 	string twoFAkey = 1;
+}
+
+// Login Mobile
+
+message LoginMobileRequest {
+	string email = 1;
+	string password = 2;
+}
+
+message LoginMobileResponse {
+	string name = 1;
+	string token = 2;
 }
 
 // Logout Mobile
