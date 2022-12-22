@@ -88,7 +88,7 @@ public class WebserverMain {
 			Timer time = new Timer();
 			generateInvoices task = new generateInvoices();
 			time.schedule(task, 20000, 15000);
-
+			//TODO: new thread for automatic delete
 
 			// Do not exit the main thread. Wait until server is terminated.
 			server.awaitTermination();

@@ -80,6 +80,16 @@ public class DatabaseQueries {
                 "PRIMARY KEY(id), " +
                 "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)";
 
+    public static final String CREATE_2FA_TABLE =
+        "CREATE TABLE twofactor (" +
+                "id INTEGER NOT NULL AUTO_INCREMENT, " + 
+                "client_id INTEGER NOT NULL, " +
+                "key VARCHAR(5) NOT NULL, " +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "PRIMARY KEY(id), " +
+                "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)";
+
+
     public static final String CREATE_CLIENT =
             "INSERT INTO client(name, email, address, password, iban, plan, salt) " +
                     "VALUES(?, ?, ?, ?, ?, ?, ?)";
@@ -91,6 +101,8 @@ public class DatabaseQueries {
             "INSERT INTO invoice(client_id, year, month, paymentAmount, energyConsumed, energyConsumedDaytime, energyConsumedNight, plan, taxes) " +
                     "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)";
     public static final String CREATE_MOBILE = "INSERT INTO mobile(register_token, client_id, salt) " +
+                    "VALUES(?, ?, ?)";
+    public static final String CREATE_2FA = "INSERT INTO twofactor(client_id, key) " +
                     "VALUES(?, ?, ?)";
                     
                     
@@ -127,6 +139,9 @@ public class DatabaseQueries {
 
     public static final String READ_MOBILE_TOKEN_WITH_EMAIL = "SELECT register_token FROM mobile INNER JOIN client ON mobile.client_id = client.id WHERE client.email = ?";
     public static final String READ_MOBILE_TOKEN_WITH_NAME = "SELECT register_token FROM mobile JOIN client ON mobile.client_id = client.id WHERE client.name = ?";
+    
+    
+    public static final String READ_2FA_KEY = "SELECT key FROM twofactor WHERE client_id = ?";
 
 
 
@@ -138,4 +153,10 @@ public class DatabaseQueries {
     public static final String UPDATE_CLIENT_ADDRESS = "UPDATE client SET address = ? WHERE email = ?";
 
     public static final String UPDATE_CLIENT_PLAN = "UPDATE client SET plan = ? WHERE email = ?";
+
+
+
+
+    public static final String DELETE_2FA = "DELETE FROM my_table WHERE TIMESTAMPDIFF(SECOND, created_at, NOW()) > 60";
+
 }
