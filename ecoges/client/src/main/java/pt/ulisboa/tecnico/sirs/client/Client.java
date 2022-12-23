@@ -13,14 +13,14 @@ import java.util.ArrayList;
 
 public class Client {
 	private static ManagedChannel channel;
-	private static ServerServiceGrpc.ServerServiceBlockingStub server;
+	private static WebserverServiceGrpc.WebserverServiceBlockingStub server;
 
 	public static void init(String host, int port) throws IOException {
 		String target = host + ":" + port;
 		InputStream cert = Files.newInputStream(Paths.get("../tlscerts/webserver.crt"));
 
 		channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
-		server = ServerServiceGrpc.newBlockingStub(channel);
+		server = WebserverServiceGrpc.newBlockingStub(channel);
 	}
 
 	public static void close(){

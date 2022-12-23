@@ -6,14 +6,13 @@ package pt.ulisboa.tecnico.sirs.backoffice.grpc;
 
 option java_multiple_files = true;
 
-service BackofficeAdminService {
+service BackofficeService {
 	rpc register(RegisterRequest) returns (AckResponse);
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);
 	rpc listClients(ListClientsRequest) returns (ListClientsResponse);
 	rpc checkPersonalInfo(CheckPersonalInfoRequest) returns (CheckPersonalInfoResponse);
 	rpc checkEnergyPanel(CheckEnergyPanelRequest) returns (CheckEnergyPanelResponse);
-	rpc deleteClient(DeleteClientRequest) returns (AckResponse);
 }
 
 enum PlanType {
@@ -122,11 +121,4 @@ message CheckEnergyPanelRequest {
 
 message CheckEnergyPanelResponse {
 	EnergyPanel energyPanel = 1;
-}
-
-// Delete client
-message DeleteClientRequest {
-	string username = 1;
-	string email = 2;
-	string hashedToken = 3;
 }

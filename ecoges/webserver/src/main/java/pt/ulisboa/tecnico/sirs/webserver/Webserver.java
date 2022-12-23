@@ -1,12 +1,21 @@
 package pt.ulisboa.tecnico.sirs.webserver;
 
-import pt.ulisboa.tecnico.sirs.crypto.Crypto;
+import com.google.protobuf.ByteString;
+import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.*;
+import java.security.cert.*;
+import java.security.spec.InvalidKeySpecException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,36 +26,72 @@ import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
 public class Webserver {
     private final Connection dbConnection;
 
-    private String personalInfoKeyString;
-    private String energyPanelKeyString;
-
+    // Invoices
     private final int MAX_ENERGY_CONSUMPTION = 100;
     private final int MAX_ENERGY_PRODUCTION = 100;
-
     private static final List<String> months = new ArrayList<>(Arrays.asList
             ("Jan", "Feb", "Mar", "Apr", "Mai", "Jun", "Jul", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"));
 
-    public Webserver(Connection dbConnection) {
+    // Trust Store
+    private static final String TRUST_STORE_FILE = "src/main/resources/webserver.truststore";
+    private static final String TRUST_STORE_PASSWORD = "webserver";
+    private static final String TRUST_STORE_ALIAS_CA = "ca";
+
+    // Compartments
+    private final SecretKey personalInfoKey;
+    private final SecretKey energyPanelKey;
+
+    public Webserver(Connection dbConnection, SecretKey personalInfoKey, SecretKey energyPanelKey) {
         this.dbConnection = dbConnection;
-    }
-
-    public void setPersonalInfoKeyString(String keyString) {
-        personalInfoKeyString = keyString;
-    }
-
-    public void setEnergyPanelKeyString(String keyString) {
-        energyPanelKeyString = keyString;
-    }
-
-    public String getPersonalInfoKeyString() {
-        return personalInfoKeyString;
-    }
-
-    public String getEnergyPanelKeyString() {
-        return energyPanelKeyString;
+        this.personalInfoKey = personalInfoKey;
+        this.energyPanelKey = energyPanelKey;
     }
 
     /*
+    -----------------------------------------------
+    -------------- BACKOFFICE SERVICE -------------
+    -----------------------------------------------
+     */
+
+    public byte[] getCompartmentKey(GetCompartmentKeyRequest.RequestData data, ByteString signature) throws CompartmentKeyException,
+            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException,
+            InvalidKeySpecException, CertificateException, SignatureException, InvalidSignatureException,
+            BadPaddingException, InvalidHashException, KeyStoreException, IOException, InvalidAlgorithmParameterException, CertPathValidatorException {
+
+        Compartment compartment = data.getCompartment();
+        byte[] certificateBytes = data.getCertificate().toByteArray();
+
+        CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+        X509Certificate departmentCertificate = (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(certificateBytes));
+        PublicKey departmentPublicKey = departmentCertificate.getPublicKey();
+
+        // Verify authenticity and integrity
+        if (!Security.verifySignature(departmentPublicKey, signature.toByteArray(), data.toByteArray())) {
+            throw new InvalidSignatureException();
+        }
+
+        // Validate certificate chain with trusted CA
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        trustStore.load(Files.newInputStream(Paths.get(TRUST_STORE_FILE)), TRUST_STORE_PASSWORD.toCharArray());
+        X509Certificate CACertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_CA);
+
+        Security.validateCertificateChain(departmentCertificate, CACertificate);
+
+        // TODO: Validate signature of access control infrastructure (the response should be signed)
+
+        // Get compartment keys
+
+        if (compartment.equals(Compartment.PERSONAL_INFO)) {
+            return Security.wrapKey(departmentPublicKey, personalInfoKey);
+        }
+        else if (compartment.equals(Compartment.ENERGY_PANEL)) {
+            return Security.wrapKey(departmentPublicKey, energyPanelKey);
+        }
+        else {
+            throw new CompartmentKeyException();
+        }
+    }
+/*
     ------------------------------------------------------
     ---------------- CLIENT SESSION TOKEN ----------------
     ------------------------------------------------------
@@ -55,8 +100,8 @@ public class Webserver {
     public String setClientSession(String email) throws NoSuchAlgorithmException, SQLException {
         PreparedStatement st;
 
-        String token = Crypto.generateToken();
-        String hashedToken = Crypto.hash(token);
+        String token = Security.generateToken();
+        String hashedToken = Security.hash(token);
 
         st = dbConnection.prepareStatement(UPDATE_CLIENT_TOKEN);
         st.setString(1, hashedToken);
@@ -119,8 +164,8 @@ public class Webserver {
 
         // create client
 
-        byte[] salt = Crypto.generateSalt();
-        String hashedPassword = Crypto.hashWithSalt(password, salt);
+        byte[] salt = Security.generateSalt();
+        String hashedPassword = Security.hashWithSalt(password, salt);
 
         st = dbConnection.prepareStatement(CREATE_CLIENT);
         st.setString(1, name);
@@ -130,21 +175,21 @@ public class Webserver {
 
         // encrypted compartment: personal info
         st.setString(5, address);
-        st.setString(6, personalInfoKeyString);
+        st.setString(6, personalInfoKey.toString());
         st.setString(7, iban);
-        st.setString(8, personalInfoKeyString);
+        st.setString(8, personalInfoKey.toString());
         st.setString(9, plan);
-        st.setString(10, personalInfoKeyString);
+        st.setString(10, personalInfoKey.toString());
 
         // encrypted compartment: energy panel
         st.setFloat(11, 0);
-        st.setString(12, energyPanelKeyString);
+        st.setString(12, energyPanelKey.toString());
         st.setFloat(13, 0);
-        st.setString(14, energyPanelKeyString);
+        st.setString(14, energyPanelKey.toString());
         st.setFloat(15, 0);
-        st.setString(16, energyPanelKeyString);
+        st.setString(16, energyPanelKey.toString());
         st.setFloat(17, 0);
-        st.setString(18, energyPanelKeyString);
+        st.setString(18, energyPanelKey.toString());
         st.executeUpdate();
         st.close();
     }
@@ -167,7 +212,7 @@ public class Webserver {
             name = rs.getString(1);
             String dbHashedPassword = rs.getString(2);
             byte[] salt = rs.getBytes(3);
-            String hashedPassword = Crypto.hashWithSalt(password, salt);
+            String hashedPassword = Security.hashWithSalt(password, salt);
             if (!hashedPassword.equals(dbHashedPassword)) {
                 st.close();
                 throw new WrongPasswordException();
@@ -236,11 +281,11 @@ public class Webserver {
         st.setString(2, applianceName);
         st.setString(3, applianceBrand);
         st.setFloat(4, energyConsumed);
-        st.setString(5, energyPanelKeyString);
+        st.setString(5, energyPanelKey.toString());
         st.setFloat(6, energyConsumedDaytime);
-        st.setString(7, energyPanelKeyString);
+        st.setString(7, energyPanelKey.toString());
         st.setFloat(8, energyConsumedNight);
-        st.setString(9, energyPanelKeyString);
+        st.setString(9, energyPanelKey.toString());
         st.executeUpdate();
         st.close();
 
@@ -280,7 +325,7 @@ public class Webserver {
         st.setString(2, solarPanelName);
         st.setString(3, solarPanelBrand);
         st.setFloat(4, energyProduced);
-        st.setString(5, energyPanelKeyString);
+        st.setString(5, energyPanelKey.toString());
         st.executeUpdate();
         st.close();
 
@@ -301,9 +346,9 @@ public class Webserver {
         st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
 
         //encrypted compartment: personal info
-        st.setString(1, personalInfoKeyString);
-        st.setString(2, personalInfoKeyString);
-        st.setString(3, personalInfoKeyString);
+        st.setString(1, personalInfoKey.toString());
+        st.setString(2, personalInfoKey.toString());
+        st.setString(3, personalInfoKey.toString());
 
         st.setString(4, clientEmail);
         rs = st.executeQuery();
@@ -352,10 +397,10 @@ public class Webserver {
 
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
         //encrypted compartment: energy panel
-        st.setString(1, energyPanelKeyString);
-        st.setString(2, energyPanelKeyString);
-        st.setString(3, energyPanelKeyString);
-        st.setString(4, energyPanelKeyString);
+        st.setString(1, energyPanelKey.toString());
+        st.setString(2, energyPanelKey.toString());
+        st.setString(3, energyPanelKey.toString());
+        st.setString(4, energyPanelKey.toString());
 
         st.setString(5, email);
         rs = st.executeQuery();
@@ -437,7 +482,7 @@ public class Webserver {
         // update address
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ADDRESS);
         st.setString(1, address);
-        st.setString(2, personalInfoKeyString);
+        st.setString(2, personalInfoKey.toString());
         st.setString(3, email);
         st.executeUpdate();
         st.close();
@@ -452,7 +497,7 @@ public class Webserver {
         // update plan
         PreparedStatement st = dbConnection.prepareStatement(UPDATE_CLIENT_PLAN);
         st.setString(1, plan);
-        st.setString(2, personalInfoKeyString);
+        st.setString(2, personalInfoKey.toString());
         st.setString(3, email);
         st.executeUpdate();
         st.close();
@@ -497,9 +542,9 @@ public class Webserver {
 
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION);
-        st.setString(1, energyPanelKeyString);
-        st.setString(2, energyPanelKeyString);
-        st.setString(3, energyPanelKeyString);
+        st.setString(1, energyPanelKey.toString());
+        st.setString(2, energyPanelKey.toString());
+        st.setString(3, energyPanelKey.toString());
         st.setString(4, email);
 
         rs = st.executeQuery();
@@ -516,11 +561,11 @@ public class Webserver {
         // update energy consumption
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ENERGY_CONSUMPTION);
         st.setFloat(1, currEnergyConsumed + energyConsumed);
-        st.setString(2, energyPanelKeyString);
+        st.setString(2, energyPanelKey.toString());
         st.setFloat(3, currEnergyConsumedDaytime + energyConsumedDaytime);
-        st.setString(4, energyPanelKeyString);
+        st.setString(4, energyPanelKey.toString());
         st.setFloat(5, currEnergyConsumedNight + energyConsumedNight);
-        st.setString(6, energyPanelKeyString);
+        st.setString(6, energyPanelKey.toString());
         st.setString(7, email);
         st.executeUpdate();
         st.close();
@@ -534,7 +579,7 @@ public class Webserver {
 
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PRODUCTION);
-        st.setString(1, energyPanelKeyString);
+        st.setString(1, energyPanelKey.toString());
         st.setString(2, email);
         rs = st.executeQuery();
         if (rs.next()){
@@ -549,7 +594,7 @@ public class Webserver {
         // update energy consumption
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ENERGY_PRODUCTION);
         st.setFloat(1, currEnergyProduced + energyProduced);
-        st.setString(2, energyPanelKeyString);
+        st.setString(2, energyPanelKey.toString());
         st.setString(3, email);
         st.executeUpdate();
         st.close();
@@ -562,9 +607,9 @@ public class Webserver {
         List<Appliance> appliances = new ArrayList<>();
 
         st = dbConnection.prepareStatement(READ_APPLIANCES);
-        st.setString(1, energyPanelKeyString);
-        st.setString(2, energyPanelKeyString);
-        st.setString(3, energyPanelKeyString);
+        st.setString(1, energyPanelKey.toString());
+        st.setString(2, energyPanelKey.toString());
+        st.setString(3, energyPanelKey.toString());
         st.setInt(4, clientId);
         rs = st.executeQuery();
 
@@ -596,7 +641,7 @@ public class Webserver {
         List<SolarPanel> solarPanels = new ArrayList<>();
 
         st = dbConnection.prepareStatement(READ_SOLAR_PANELS);
-        st.setString(1, energyPanelKeyString);
+        st.setString(1, energyPanelKey.toString());
         st.setInt(2, clientId);
         rs = st.executeQuery();
 

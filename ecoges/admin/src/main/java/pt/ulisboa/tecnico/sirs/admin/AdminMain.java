@@ -1,13 +1,8 @@
 package pt.ulisboa.tecnico.sirs.admin;
 
-import pt.ulisboa.tecnico.sirs.crypto.Crypto;
-import pt.ulisboa.tecnico.sirs.crypto.exceptions.WeakPasswordException;
-
 import java.io.IOException;
 import java.util.List;
 import java.util.Scanner;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class AdminMain {
 	private static String serverHost = "localhost";
@@ -168,7 +163,6 @@ public class AdminMain {
 						"1. List Clients\n" +
 						"2. Check Client Personal Info\n" +
 						"3. Check Client Energy Panel\n" +
-						"4. Delete Client\n" +
 						"0. Logout");
 				System.out.print("> ");
 
@@ -189,14 +183,6 @@ public class AdminMain {
 						input = scanner.nextLine();
 						result = Admin.checkClientEnergyPanel(username, input, hashedToken);
 						System.out.println(result);
-						continue;
-					case "4":
-						System.out.print("Enter the client email: ");
-						input = scanner.nextLine();
-						success = Admin.deleteClient(username, input, hashedToken);
-						if (success) {
-							System.out.println("Successfully deleted client.");
-						}
 						continue;
 					case "0":
 						success = Admin.logout(username, hashedToken);

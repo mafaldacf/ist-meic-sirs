@@ -1,13 +1,8 @@
 package pt.ulisboa.tecnico.sirs.client;
 
-import pt.ulisboa.tecnico.sirs.crypto.Crypto;
-import pt.ulisboa.tecnico.sirs.crypto.exceptions.WeakPasswordException;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class ClientMain {
 	private static String serverHost = "localhost";

@@ -6,7 +6,7 @@ package pt.ulisboa.tecnico.sirs.webserver.grpc;
 
 option java_multiple_files = true;
 
-service ServerService {
+service WebserverService {
 	rpc register(RegisterRequest) returns (AckResponse);
 	rpc login(LoginRequest) returns (LoginResponse);
 	rpc logout(LogoutRequest) returns (AckResponse);

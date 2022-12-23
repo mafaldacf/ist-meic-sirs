@@ -1,22 +1,23 @@
 package pt.ulisboa.tecnico.sirs.backoffice;
 
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.*;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
 
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SignatureException;
+import java.io.IOException;
+import java.security.*;
+import java.security.cert.CertificateException;
 import java.sql.SQLException;
 import java.util.List;
 
-public class BackofficeAdminServiceImpl extends BackofficeAdminServiceGrpc.BackofficeAdminServiceImplBase {
+public class BackofficeServiceImpl extends BackofficeServiceGrpc.BackofficeServiceImplBase {
 	private static Backoffice server;
 
-	public BackofficeAdminServiceImpl(Backoffice backofficeServer) {
+	public BackofficeServiceImpl(Backoffice backofficeServer) {
 		server = backofficeServer;
 	}
 
@@ -103,13 +104,18 @@ public class BackofficeAdminServiceImpl extends BackofficeAdminServiceGrpc.Backo
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException e){
+		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
+				 UnrecoverableKeyException | CertificateException | KeyStoreException | SignatureException |
+				 InvalidKeyException | IOException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidRoleException | AdminDoesNotExistException | InvalidSessionTokenException | ClientDoesNotExistException |
-				CompartmentKeyException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
+		} catch (InvalidRoleException | InvalidSessionTokenException | CompartmentKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		} catch (PermissionDeniedException e) {
 			responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());
+		} catch (ClientDoesNotExistException | AdminDoesNotExistException e) {
+			responseObserver.onError(Status.NOT_FOUND.withDescription(e.getMessage()).asRuntimeException());
+		} catch (StatusRuntimeException e) {
+			responseObserver.onError(e.getStatus().asRuntimeException());
 		}
 	}
 
@@ -123,31 +129,18 @@ public class BackofficeAdminServiceImpl extends BackofficeAdminServiceGrpc.Backo
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException e){
+		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
+				 UnrecoverableKeyException | CertificateException | KeyStoreException | SignatureException |
+				 InvalidKeyException | IOException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidRoleException | AdminDoesNotExistException | InvalidSessionTokenException |
-				 ClientDoesNotExistException | CompartmentKeyException | IllegalBlockSizeException |
-				 NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
+		} catch (InvalidRoleException | InvalidSessionTokenException | CompartmentKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		} catch (PermissionDeniedException e) {
 			responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());
-		}
-	}
-
-	@Override
-	public void deleteClient(DeleteClientRequest request, StreamObserver<AckResponse> responseObserver) {
-		AckResponse.Builder builder = AckResponse.newBuilder();
-		try {
-			boolean ack = server.deleteClient(request.getUsername(), request.getEmail(), request.getHashedToken());
-
-			builder.setAck(ack);
-
-			responseObserver.onNext(builder.build());
-			responseObserver.onCompleted();
-		} catch (SQLException e){
-			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (AdminDoesNotExistException | ClientDoesNotExistException | InvalidSessionTokenException e) {
-			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		} catch (ClientDoesNotExistException | AdminDoesNotExistException e) {
+			responseObserver.onError(Status.NOT_FOUND.withDescription(e.getMessage()).asRuntimeException());
+		} catch (StatusRuntimeException e) {
+			responseObserver.onError(e.getStatus().asRuntimeException());
 		}
 	}
 }

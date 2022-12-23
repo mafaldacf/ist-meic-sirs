@@ -14,14 +14,14 @@ import java.util.List;
 
 public class Admin {
 	private static ManagedChannel channel;
-	private static BackofficeAdminServiceGrpc.BackofficeAdminServiceBlockingStub server;
+	private static BackofficeServiceGrpc.BackofficeServiceBlockingStub server;
 
 	public static void init(String host, int port) throws IOException {
 		String target = host + ":" + port;
 		InputStream cert = Files.newInputStream(Paths.get("../tlscerts/backoffice.crt"));
 
 		channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
-		server = BackofficeAdminServiceGrpc.newBlockingStub(channel);
+		server = BackofficeServiceGrpc.newBlockingStub(channel);
 	}
 
 	public static void close(){
@@ -152,21 +152,6 @@ public class Admin {
 			System.out.println(e.getMessage());
 		}
 		return result;
-	}
-
-	public static boolean deleteClient(String username, String email, String hashedToken) {
-		try {
-			DeleteClientRequest request = DeleteClientRequest.newBuilder()
-					.setUsername(username)
-					.setEmail(email)
-					.setHashedToken(hashedToken)
-					.build();
-			AckResponse response = server.deleteClient(request);
-			return(response.getAck());
-		} catch (StatusRuntimeException e) {
-			System.out.println(e.getMessage());
-		}
-		return false;
 	}
 }
 

@@ -1,4 +1,4 @@
-package pt.ulisboa.tecnico.sirs.crypto.exceptions;
+package pt.ulisboa.tecnico.sirs.security.exceptions;
 
 public class WeakPasswordException extends Exception {
 

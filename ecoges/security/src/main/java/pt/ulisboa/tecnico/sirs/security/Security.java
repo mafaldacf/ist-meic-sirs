@@ -1,20 +1,19 @@
-package pt.ulisboa.tecnico.sirs.crypto;
+package pt.ulisboa.tecnico.sirs.security;
 
 import com.google.protobuf.ByteString;
-import pt.ulisboa.tecnico.sirs.crypto.exceptions.WeakPasswordException;
+import pt.ulisboa.tecnico.sirs.security.exceptions.WeakPasswordException;
 
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
+import javax.crypto.*;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
+import java.security.cert.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Crypto {
+public class Security {
 
     public static boolean verifyStrongPassword(String password) throws WeakPasswordException {
         String regex = "" +
@@ -67,13 +66,6 @@ public class Crypto {
         return bytes;
     }
 
-    public static byte[] randomBytes(int n) throws NoSuchAlgorithmException {
-        SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
-        byte[] bytes = new byte[n];
-        random.nextBytes(bytes);
-        return bytes;
-    }
-
     public static String bytesToHex(byte[] bytes) {
         StringBuilder hexString = new StringBuilder(2 * bytes.length);
         for (byte aByte : bytes) {
@@ -87,41 +79,16 @@ public class Crypto {
     }
 
     public static byte[] wrapKey(PublicKey publicKey, Key secretKey) throws InvalidKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException {
-        Cipher cipher = Cipher.getInstance("RSA/ECB/NoPadding");
+        Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
         cipher.init(Cipher.WRAP_MODE, publicKey);
-        final byte[] wrapped = cipher.wrap(secretKey);
-        return wrapped;
+        return cipher.wrap(secretKey);
     }
 
-    public static Key unwrapKey(PrivateKey privateKey, byte[] wrappedSecretKey) throws InvalidKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException {
-        Cipher cipher = Cipher.getInstance("RSA/ECB/NoPadding");
+    public static SecretKey unwrapKey(PrivateKey privateKey, byte[] wrappedSecretKey) throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
+        Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
         cipher.init(Cipher.UNWRAP_MODE, privateKey);
-        Key secretKey = cipher.unwrap(wrappedSecretKey, "AES", Cipher.SECRET_KEY);
-        return secretKey;
+        return (SecretKey) cipher.unwrap(wrappedSecretKey, "AES", Cipher.SECRET_KEY);
     }
-
-    public static KeyPair generateKeyPair() throws NoSuchAlgorithmException {
-        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-        keyGen.initialize(4096);
-        return keyGen.generateKeyPair();
-    }
-    public static ByteString getEncodedKey(Key key) {
-        return ByteString.copyFrom(key.getEncoded());
-    }
-
-    public static PublicKey getPublicKey(ByteString encodedKey) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(encodedKey.toByteArray());
-        return keyFactory.generatePublic(keySpec);
-    }
-
-    public static PrivateKey getPrivateKey(ByteString encodedKey) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(encodedKey.toByteArray());
-        return keyFactory.generatePrivate(keySpec);
-    }
-
-    /* Utils for Signatures with SHA256 */
 
     public static ByteString signMessage(PrivateKey key, byte[] message) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
         byte[] digest = MessageDigest.getInstance("SHA-256").digest(message);
@@ -129,6 +96,7 @@ public class Crypto {
         Signature signer = Signature.getInstance("SHA256withRSA");
         signer.initSign(key);
         signer.update(digest);
+
         return ByteString.copyFrom(signer.sign());
     }
 
@@ -140,6 +108,25 @@ public class Crypto {
         signer.update(digest);
 
         return signer.verify(signedMessage);
+    }
+
+    public static void validateCertificateChain(X509Certificate certificate, X509Certificate CACertificate) throws CertificateException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, CertPathValidatorException {
+        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+
+        CertPath cp = cf.generateCertPath(Collections.singletonList((certificate)));
+        Set<TrustAnchor> trustAnchors = Set.of(new TrustAnchor(CACertificate, null));
+
+        // Create a PKIXParameters object with the trust anchors
+        PKIXParameters params = new PKIXParameters(trustAnchors);
+
+        // Disable certificate revocation checking
+        params.setRevocationEnabled(false);
+
+        // Create a CertPathValidator object
+        CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
+
+        // Validate the certificate chain
+        cpv.validate(cp, params);
     }
 
 

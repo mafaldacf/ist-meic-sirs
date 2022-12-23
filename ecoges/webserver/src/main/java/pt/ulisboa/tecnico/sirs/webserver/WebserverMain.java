@@ -8,50 +8,43 @@ import java.security.cert.CertificateException;
 import java.sql.*;
 import java.util.*;
 
-import io.grpc.ManagedChannel;
 import io.grpc.Server;
-import io.grpc.StatusRuntimeException;
 import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
-import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
-import pt.ulisboa.tecnico.sirs.crypto.Crypto;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.CompartmentKeyException;
+import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.PlanType;
 
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
-import javax.net.ssl.SSLException;
+import javax.crypto.SecretKey;
 
 import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
 
 public class WebserverMain {
 
-	private static Webserver server;
+	private static Webserver webserver;
 
 	private static boolean gotCompartmentKeys = false;
 
-	private static final String KEY_STORE_FILE = "src/main/resources/webserver.jks";
-	private static final String KEY_STORE_TYPE = "JKS";
+	// Data compartments
+	private static final String KEY_STORE_FILE = "src/main/resources/webserver.keystore";
 	private static final String KEY_STORE_PASSWORD = "webserver";
 	private static final String KEY_STORE_ALIAS_WEBSERVER = "webserver";
+
+	private static KeyPair keyPair;
+
+	private static SecretKey personalInfoKey;
+
+	private static SecretKey energyPanelKey;
 
 	// TLS
 	private static InputStream cert;
 	private static InputStream key;
 
 	private static final String CERTIFICATE_PATH = "../tlscerts/webserver.crt";
-	private static final String BACKOFFICE_CERTIFICATE_PATH = "../tlscerts/backoffice.crt";
 	private static final String KEY_PATH = "../tlscerts/webserver.pem";
-
-	// Backoffice
-
-	private static String backofficeHost = "localhost";
-	private static int backofficePort = 8001;
-
-	private static BackofficeWebserverServiceGrpc.BackofficeWebserverServiceBlockingStub backofficeServer;
 
 	// Database
 
@@ -63,7 +56,7 @@ public class WebserverMain {
 
 	private static final String DATABASE_DRIVER = "com.mysql.cj.jdbc.Driver";
 
-	private static String databaseURL = "jdbc:mysql://localhost:3306/clientdb"; // default value
+	private static String dbUrl = "jdbc:mysql://localhost:3306/clientdb"; // default value
 
 	// Invoices
 
@@ -81,28 +74,25 @@ public class WebserverMain {
 	private static final float BI_HOURLY_NIGHT_COST = 0.15F;
 
 
-	// Usage: <serverPort> <backofficeHost> <backofficePort> <databaseHost> <databasePort>
+	// Usage: <serverPort> <databaseHost> <databasePort>
 	public static void main(String[] args) {
 
 		// Parse arguments
 		try {
-			if (args.length == 5) {
+			if (args.length == 3) {
 				// server
 				serverPort = Integer.parseInt(args[0]);
 
-				// backoffice
-				backofficeHost = args[1];
-				backofficePort = Integer.parseInt(args[2]);
-
 				// database
-				String dbHost = args[3];
-				int dbPort = Integer.parseInt(args[4]);
-				databaseURL = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + DATABASE;
+				String dbHost = args[1];
+				int dbPort = Integer.parseInt(args[2]);
+				dbUrl = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + DATABASE;
 			}
 
 		} catch (NumberFormatException e) {
 			System.out.println("ERROR: Invalid arguments.");
 			System.out.println("Usage: [<serverPort>] [<backofficeHost>] [<backofficePort>] [<databaseHost>] [<databasePort>]");
+			System.out.println("Exiting...");
 			System.exit(1);
 		}
 
@@ -112,19 +102,8 @@ public class WebserverMain {
 			cert = Files.newInputStream(Paths.get(CERTIFICATE_PATH));
 			key = Files.newInputStream(Paths.get(KEY_PATH));
 		} catch(IllegalArgumentException | UnsupportedOperationException | IOException e){
-			System.out.println("ERROR: Could not load server key or certificate.");
-			System.exit(1);
-		}
-
-		// Setup connection with backoffice
-
-		try {
-			String target = backofficeHost + ":" + backofficePort;
-			InputStream cert = Files.newInputStream(Paths.get(BACKOFFICE_CERTIFICATE_PATH));
-			ManagedChannel channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
-			backofficeServer = BackofficeWebserverServiceGrpc.newBlockingStub(channel);
-		} catch (IOException e) {
-			System.out.println("ERROR: Could not setup backoffice certificate.");
+			System.out.println("ERROR: Could not load server key or certificate: " + e.getMessage());
+			System.out.println("Exiting...");
 			System.exit(1);
 		}
 
@@ -134,16 +113,20 @@ public class WebserverMain {
 			SslContext sslContext = GrpcSslContexts.forServer(cert, key).build();
 			System.out.println(">>> " + WebserverMain.class.getSimpleName() + " <<<");
 
+			loadKeyPairs();
+
 			// Database
-			System.out.println("Setting up database connection on " + databaseURL);
+			System.out.println("Setting up database connection on " + dbUrl);
 			Class.forName(DATABASE_DRIVER);
-			dbConnection = DriverManager.getConnection(databaseURL, DATABASE_USER, DATABASE_PASSWORD);
+			dbConnection = DriverManager.getConnection(dbUrl, DATABASE_USER, DATABASE_PASSWORD);
 			setupDatabase();
 
 			// Service
-			server = new Webserver(dbConnection);
-			WebserverServiceImpl impl = new WebserverServiceImpl(server);
-			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext).addService(impl).build();
+			webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey);
+			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext)
+					.addService(new WebserverServiceImpl(webserver))
+					.addService(new WebserverBackofficeServiceImpl(webserver))
+					.build();
 			server.start();
 			System.out.println("Listening on port " + serverPort + "...");
 
@@ -151,9 +134,6 @@ public class WebserverMain {
 			Timer time = new Timer();
 			generateInvoices task = new generateInvoices();
 			time.schedule(task, 20000, 15000);
-
-			// Load compartment keys
-			requestCompartmentKeys();
 
 			// Do not exit the main thread. Wait until server is terminated.
 			server.awaitTermination();
@@ -163,41 +143,68 @@ public class WebserverMain {
 			System.out.println("ERROR: Could not start server: " + e.getMessage());
 		} catch (SQLException e) {
 			System.out.println("ERROR: Could not connect to database: " + e.getMessage());
-		} catch (ClassNotFoundException e) {
-			System.out.println("ERROR: Database class not found: " + e.getMessage());
+		} catch (ClassNotFoundException | UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {
+			System.out.println("ERROR: Could not load compartment keys from JavaKeyStore: " + e.getMessage());
+		} finally {
+			System.out.println("Exiting...");
 		}
 	}
 
-	public static void requestCompartmentKeys() {
-		while(true) {
-			Scanner scanner = new Scanner(System.in);
-			System.out.print("\nPress ENTER to request compartment keys from backoffice");
-			scanner.nextLine();
+	private static void loadKeyPairs() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
+			IOException, UnrecoverableKeyException {
+		PrivateKey privateKey;
+		PublicKey publicKey;
 
-			try {
-				getCompartmentKeysRequest request = getCompartmentKeysRequest.newBuilder().build();
-				getCompartmentKeysResponse response = backofficeServer.getCompartmentKeys(request);
+		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
 
-				// decrypt received keys with own private key
-				KeyStore keyStore = KeyStore.getInstance(KEY_STORE_TYPE);
-				keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
-				PrivateKey privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_WEBSERVER, KEY_STORE_PASSWORD.toCharArray());
+		// Webserver key pair
+		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_WEBSERVER, KEY_STORE_PASSWORD.toCharArray());
+		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_WEBSERVER).getPublicKey();
+		keyPair = new KeyPair(publicKey, privateKey);
 
-				Key personalInfoKey = Crypto.unwrapKey(privateKey, response.getPersonalInfoKey().toByteArray());
-				Key energyPanelKey = Crypto.unwrapKey(privateKey, response.getEnergyPanelKey().toByteArray());
+		System.out.println("Successfully loaded key pairs from JavaKeyStore!");
+	}
 
-				server.setPersonalInfoKeyString(personalInfoKey.toString());
-				server.setEnergyPanelKeyString(energyPanelKey.toString());
+	private static void generateCompartmentKeys() throws NoSuchAlgorithmException, SQLException, IllegalBlockSizeException,
+			NoSuchPaddingException, InvalidKeyException {
 
-				gotCompartmentKeys = true;
+		PreparedStatement st;
+		ResultSet rs;
 
-				System.out.print("Successfully loaded compartment keys!\n");
-			} catch (StatusRuntimeException | KeyStoreException | IOException | NoSuchAlgorithmException |
-					 UnrecoverableKeyException | CertificateException | InvalidKeyException |
-					 IllegalBlockSizeException | NoSuchPaddingException e) {
-				System.out.println(e.getMessage());
-			}
+		// Check if keys already exist
+		st = dbConnection.prepareStatement(READ_COMPARTMENT_KEYS);
+		rs = st.executeQuery();
+
+		if (rs.next()){
+			personalInfoKey = Security.unwrapKey(keyPair.getPrivate(), rs.getBytes(1));
+			energyPanelKey = Security.unwrapKey(keyPair.getPrivate(), rs.getBytes(2));
+			st.close();
+			return;
 		}
+		st.close();
+
+		System.out.println("Generating compartment keys...");
+
+
+		// Generate key for personal info compartment
+		KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+		keyGen.init(256);
+		personalInfoKey = keyGen.generateKey();
+		byte[] wrappedPersonalInfoKey = Security.wrapKey(keyPair.getPublic(), personalInfoKey);
+
+		// Generate key for energy panel compartment
+		keyGen = KeyGenerator.getInstance("AES");
+		keyGen.init(256);
+		energyPanelKey = keyGen.generateKey();
+		byte[] wrappedEnergyPanelKey = Security.wrapKey(keyPair.getPublic(), energyPanelKey);
+
+		// Upload keys to database
+		st = dbConnection.prepareStatement(CREATE_COMPARTMENT_KEYS);
+		st.setBytes(1, wrappedPersonalInfoKey);
+		st.setBytes(2, wrappedEnergyPanelKey);
+		st.executeUpdate();
+		st.close();
 	}
 
 	private static void setupDatabase() {
@@ -209,16 +216,23 @@ public class WebserverMain {
 			statement.execute(DROP_SOLAR_PANEL_TABLE);
 			statement.execute(DROP_APPLIANCE_TABLE);
 			statement.execute(DROP_CLIENT_TABLE);
+			statement.execute(DROP_COMPARTMENT_KEYS_TABLE);
 
 			statement = dbConnection.createStatement();
 			statement.execute(CREATE_CLIENT_TABLE);
 			statement.execute(CREATE_APPLIANCE_TABLE);
 			statement.execute(CREATE_SOLAR_PANEL_TABLE);
 			statement.execute(CREATE_INVOICE_TABLE);
+			statement.execute(CREATE_COMPARTMENT_KEYS_TABLE);
+
+			generateCompartmentKeys();
 
 			System.out.println("Database is ready!");
 		} catch (SQLException e) {
 			System.out.println("Could not set up database: "+ e.getMessage());
+			System.exit(1);
+		} catch (IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e) {
+			System.out.println("Could not generate compartment keys: "+ e.getMessage());
 			System.exit(1);
 		}
 	}
@@ -275,14 +289,11 @@ public class WebserverMain {
 			PreparedStatement st;
 			ResultSet rs;
 			try {
-				String energyPanelKey = server.getEnergyPanelKeyString();
-				String personalInfoKey = server.getPersonalInfoKeyString();
-
 				st = dbConnection.prepareStatement(READ_ALL_CLIENTS_ID_ENERGY_CONSUMPTION_PLAN);
-				st.setString(1, energyPanelKey);
-				st.setString(2, energyPanelKey);
-				st.setString(3, energyPanelKey);
-				st.setString(4, personalInfoKey);
+				st.setString(1, personalInfoKey.toString());
+				st.setString(2, personalInfoKey.toString());
+				st.setString(3, personalInfoKey.toString());
+				st.setString(4, energyPanelKey.toString());
 				rs = st.executeQuery();
 
 				while (rs.next()) {
