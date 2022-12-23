@@ -78,7 +78,7 @@ For each machine, run the following commands:
 
 > **TIP: If the script does not run as expected, convert the file to unix format using the `dos2unix` tool and run the script again**
 >
->    \> **`dos2unix ./<script>.sh`**
+>    \> **`dos2unix <script>.sh`**
 
 
 Firewall machine:
@@ -123,10 +123,10 @@ To generate the certificates, simply run the script:
 
 > **TIP: If the script does not run as expected, convert the file to unix format using the `dos2unix` tool and run the script again**
 >
->    \> **`dos2unix ./generateCertificates.sh`**
+>    \> **`dos2unix generateCertificates.sh`**
 
     cd ecoges/scripts
-    ./script.sh
+    ./generateCertificates.sh
 
 # Set Up Database
 
