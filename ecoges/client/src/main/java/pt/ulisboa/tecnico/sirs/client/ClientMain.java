@@ -76,8 +76,22 @@ public class ClientMain {
 		name = scanner.nextLine();
 		System.out.print("Enter your email: ");
 		email = scanner.nextLine();
+
+		//System.out.print("Enter your strong password (10 to 30 characters and at least: 1 uppercase, 1 lowercase, 1 digit and 1 special character): ");
+
 		System.out.print("Enter your password: ");
 		password = scanner.nextLine();
+		/* while(true) {
+			try {
+				password = scanner.nextLine();
+				Crypto.verifyStrongPassword(password);
+				break;
+			} catch (WeakPasswordException e) {
+				System.out.println(e.getMessage());
+				System.out.print("Enter your strong password again: ");
+			}
+		} */
+
 		System.out.print("Enter your address: ");
 		address = scanner.nextLine();
 		System.out.print("Enter your bank account IBAN: ");

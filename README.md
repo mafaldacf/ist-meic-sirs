@@ -72,55 +72,61 @@ All machines will be running on Linux and configured according to the following 
 
 For each machine, run the following commands:
 
-    cd ecoges/network_configuration
+    cd ecoges/scripts
+    chmod 777 <script>.sh
+
+
+> **TIP: If the script does not run as expected, convert the file to unix format using the `dos2unix` tool and run the script again**
+>
+>    \> **`dos2unix <script>.sh`**
+
 
 Firewall machine:
     
-    chmod 777 firewall.sh
     sudo ./firewall.sh
 
 Webserver machine:
 
-    chmod 777 webserver.sh
     sudo ./webserver.sh
 
 Backoffice machine:
 
-    chmod 777 backoffice.sh
     sudo ./backoffice.sh
 
 Database machine:
 
-    chmod 777 db.sh
     sudo ./db.sh
 
 Admin machine:
 
-    chmod 777 admin-terminal.sh
     sudo ./terminal.sh
 
 # Generate Certificates
 
-Before deploying all machines, both webserver, backoffice and database ceritificates need to be issued to their IP address.
+Before deploying all machines, you need to generate the certificates that will be used for TLS connections and the departments.
 
-Change the field `IP.1` in `ecoges/tlscerts/webserver-domains.ext` to the corresponding IP address (e.g. Firewall public IP `10.0.2.4`)
+For the TLS, both webserver, backoffice and database ceritificates need to be issued to their IP address.
+
+Change the field `IP.1` in `ecoges/scripts/webserver-domains.ext` to the corresponding IP address (e.g. Firewall public IP `10.0.2.4`)
  
     IP.1 = 10.0.2.4
 
-Change the field `IP.1` in `ecoges/tlscerts/backoffice-domains.ext` to the corresponding IP address (e.g. `192.168.2.2`)
+Change the field `IP.1` in `ecoges/scripts/backoffice-domains.ext` to the corresponding IP address (e.g. `192.168.2.2`)
 
     IP.1 = 192.168.2.2
 
-Change the field `IP.1` in `ecoges/tlscerts/database-domains.ext` to the corresponding IP address (e.g. `192.168.1.2`)
+Change the field `IP.1` in `ecoges/scripts/database-domains.ext` to the corresponding IP address (e.g. `192.168.1.2`)
 
     IP.1 = 192.168.1.2
 
-To generate the certificates, simply run the shell script:
+To generate the certificates, simply run the script:
 
-    sudo apt install dos2unix
-    cd ecoges/tlscerts
-    dos2unix ./script.sh
-    ./script.sh
+> **TIP: If the script does not run as expected, convert the file to unix format using the `dos2unix` tool and run the script again**
+>
+>    \> **`dos2unix generateCertificates.sh`**
+
+    cd ecoges/scripts
+    ./generateCertificates.sh
 
 # Set Up Database
 
@@ -167,6 +173,12 @@ To configure TLS, copy keys and certificates:
     sudo cp tlscerts/database.crt /etc/mysql/tlscerts/database.crt
     sudo cp tlscerts/database.key /etc/mysql/tlscerts/database.key
 
+> **TIP: make sure these keys and certificates have root permissions, otherwise, MySQL won't be able to use SSL!**
+>
+>    \> **`chmod 777 /etc/mysql/tlscerts/ca.crt`**
+>    \> **`chmod 777 /etc/mysql/tlscerts/database.crt`**
+>    \> **`chmod 777 /etc/mysql/tlscerts/database.key`**
+
 Append the following content to `/etc/mysql/my.cnf` file:
 
     sudo vim /etc/mysql/my.cnf
@@ -182,6 +194,13 @@ Verify if everything is ok, having the following field values: `have_openssl` = 
     sudo service mysql restart
     sudo mysql
         show variables like '%ssl%';
+    exit
+
+Generate the database tables using the SQL script:
+
+    cd ecoges/scripts
+    sudo mysql
+        source createDatabaseTables.sql
     exit
 
 

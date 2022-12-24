@@ -1,0 +1,29 @@
+//
+// Protocol buffers definition
+//
+syntax = "proto3";
+package pt.ulisboa.tecnico.sirs.webserver.grpc;
+
+option java_multiple_files = true;
+
+service WebserverBackofficeService {
+  rpc getCompartmentKey(GetCompartmentKeyRequest) returns (GetCompartmentKeyResponse);
+}
+
+enum Compartment {
+  PERSONAL_INFO = 0;
+  ENERGY_PANEL = 1;
+}
+
+message GetCompartmentKeyRequest {
+  message RequestData {
+    Compartment compartment = 1;
+    bytes certificate = 2;
+  }
+  RequestData data = 1;
+  bytes signature = 2;
+}
+
+message GetCompartmentKeyResponse {
+  bytes key = 1;
+}

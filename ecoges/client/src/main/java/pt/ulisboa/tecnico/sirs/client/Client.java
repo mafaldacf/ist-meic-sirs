@@ -13,14 +13,14 @@ import java.util.ArrayList;
 
 public class Client {
 	private static ManagedChannel channel;
-	private static ServerServiceGrpc.ServerServiceBlockingStub server;
+	private static WebserverServiceGrpc.WebserverServiceBlockingStub server;
 
 	public static void init(String host, int port) throws IOException {
 		String target = host + ":" + port;
 		InputStream cert = Files.newInputStream(Paths.get("../tlscerts/webserver.crt"));
 
 		channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
-		server = ServerServiceGrpc.newBlockingStub(channel);
+		server = WebserverServiceGrpc.newBlockingStub(channel);
 	}
 
 	public static void close(){
@@ -145,7 +145,7 @@ public class Client {
 				for (Appliance appliance : energyPanel.getAppliancesList()) {
 					result += "\t" + appliance.getName() + " (" + appliance.getBrand() + ")" + " > Total: "
 							+ appliance.getEnergyConsumed() + " kWh, Daytime: " + appliance.getEnergyConsumedDaytime()
-							+ " kWh, Night: " + appliance.getEnergyConsumedNight() + "\n";
+							+ " kWh, Night: " + appliance.getEnergyConsumedNight() + " kWh\n";
 				}
 			}
 

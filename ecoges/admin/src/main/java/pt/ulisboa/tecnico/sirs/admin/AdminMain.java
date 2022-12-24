@@ -44,8 +44,22 @@ public class AdminMain {
 
 		System.out.print("Enter your username: ");
 		username = scanner.nextLine();
+
+		//System.out.print("Enter your strong password (10 to 30 characters and at least: 1 uppercase, 1 lowercase, 1 digit and 1 special character): ");
+
 		System.out.print("Enter your password: ");
 		password = scanner.nextLine();
+		/* while(true) {
+			try {
+				password = scanner.nextLine();
+				Crypto.verifyStrongPassword(password);
+				break;
+			} catch (WeakPasswordException e) {
+				System.out.println(e.getMessage());
+				System.out.print("Enter your strong password again: ");
+			}
+		} */
+
 		int role = getRole();
 		if (Admin.register(username, password, role)) {
 			System.out.println("Successfully registered with username '" + username + "'. Please login.");
@@ -149,7 +163,6 @@ public class AdminMain {
 						"1. List Clients\n" +
 						"2. Check Client Personal Info\n" +
 						"3. Check Client Energy Panel\n" +
-						"4. Delete Client\n" +
 						"0. Logout");
 				System.out.print("> ");
 
@@ -170,14 +183,6 @@ public class AdminMain {
 						input = scanner.nextLine();
 						result = Admin.checkClientEnergyPanel(username, input, hashedToken);
 						System.out.println(result);
-						continue;
-					case "4":
-						System.out.print("Enter the client email: ");
-						input = scanner.nextLine();
-						success = Admin.deleteClient(username, input, hashedToken);
-						if (success) {
-							System.out.println("Successfully deleted client.");
-						}
 						continue;
 					case "0":
 						success = Admin.logout(username, hashedToken);

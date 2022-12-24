@@ -31,7 +31,7 @@
 		<!-- contract brings gRPC dependencies with it -->
 		<dependency>
 			<groupId>pt.ulisboa.tecnico.sirs</groupId>
-			<artifactId>crypto</artifactId>
+			<artifactId>security</artifactId>
 			<version>1.0.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
@@ -71,7 +71,8 @@
 				<version>${version.maven-resources-plugin}</version>
 				<configuration>
 					<nonFilteredFileExtensions>
-						<nonFilteredFileExtension>jks</nonFilteredFileExtension>
+						<nonFilteredFileExtension>keystore</nonFilteredFileExtension>
+						<nonFilteredFileExtension>truststore</nonFilteredFileExtension>
 					</nonFilteredFileExtensions>
 				</configuration>
 			</plugin>
