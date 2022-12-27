@@ -13,7 +13,7 @@ import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
 
 // STAY?
-//import pt.ulisboa.tecnico.sirs.webserver.grpc.WebserverBackofficeServiceGrpc;
+import pt.ulisboa.tecnico.sirs.webserver.grpc.WebserverBackofficeServiceGrpc;
 
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
@@ -23,15 +23,6 @@ import static pt.ulisboa.tecnico.sirs.rbac.DatabaseQueries.*;
 public class RbacMain {
 
 	private static int serverPort = 8001;
-
-	// Data compartments
-	private static final String KEY_STORE_FILE = "src/main/resources/backoffice.keystore";
-	private static final String KEY_STORE_PASSWORD = "backoffice";
-	private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
-	private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
-
-	private static KeyPair accountManagementKeyPair;
-	private static KeyPair energyManagementKeyPair;
 
 	// TLS
 	private static InputStream cert;
@@ -99,13 +90,11 @@ public class RbacMain {
 			SslContext sslContext = GrpcSslContexts.forServer(cert, key).build();
 			System.out.println(">>> " + RbacMain.class.getSimpleName() + " <<<");
 
-			loadKeyPairs();
-
 			// Database
-			System.out.println("Setting up database connection on " + dbUrl);
-			Class.forName(DATABASE_DRIVER);
-			dbConnection = DriverManager.getConnection(dbUrl, DATABASE_USER, DATABASE_PASSWORD);
-			if (dbConnection != null) setupDatabase();
+			//System.out.println("Setting up database connection on " + dbUrl);
+			//Class.forName(DATABASE_DRIVER);
+			//dbConnection = DriverManager.getConnection(dbUrl, DATABASE_USER, DATABASE_PASSWORD);
+			//if (dbConnection != null) setupDatabase();
 
 			// Services
 			Rbac rbacServer = new Rbac(dbConnection, webserverHost, webserverPort);
@@ -120,36 +109,15 @@ public class RbacMain {
 			System.out.println("ERROR: Server aborted: " + e.getMessage());
 		} catch (IOException e) {
 			System.out.println("ERROR: Could not start server: " + e.getMessage());
-		} catch (SQLException e) {
-			System.out.println("ERROR: Could not connect to database: " + e.getMessage());
-		} catch (ClassNotFoundException e) {
-			System.out.println("ERROR: Database class not found: " + e.getMessage());
-		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {
-			System.out.println("ERROR: Could not load compartment keys from JavaKeyStore: " + e.getMessage());
+		//} catch (SQLException e) {
+		//	System.out.println("ERROR: Could not connect to database: " + e.getMessage());
+		//} catch (ClassNotFoundException e) {
+		//	System.out.println("ERROR: Database class not found: " + e.getMessage());
 		} finally {
 			System.out.println("Exiting...");
 		}
 	}
 
-	private static void loadKeyPairs() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
-			IOException, UnrecoverableKeyException {
-		PrivateKey privateKey;
-		PublicKey publicKey;
 
-		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-		keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
-
-		// Account Management
-		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
-		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT).getPublicKey();
-		accountManagementKeyPair = new KeyPair(publicKey, privateKey);
-
-		// Energy Management
-		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ENERGY_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
-		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_ENERGY_MANAGEMENT).getPublicKey();
-		energyManagementKeyPair = new KeyPair(publicKey, privateKey);
-
-		System.out.println("Successfully loaded key pairs from JavaKeyStore!");
-	}
 
 }

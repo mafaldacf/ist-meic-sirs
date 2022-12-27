@@ -22,6 +22,15 @@ public class BackofficeMain {
 
 	private static int serverPort = 8001;
 
+	// Data compartments
+	private static final String KEY_STORE_FILE = "src/main/resources/backoffice.keystore";
+	private static final String KEY_STORE_PASSWORD = "backoffice";
+	private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
+	private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
+
+	private static KeyPair accountManagementKeyPair;
+	private static KeyPair energyManagementKeyPair;
+
 	// TLS
 	private static InputStream cert;
 	private static InputStream key;
@@ -87,6 +96,8 @@ public class BackofficeMain {
 			SslContext sslContext = GrpcSslContexts.forServer(cert, key).build();
 			System.out.println(">>> " + BackofficeMain.class.getSimpleName() + " <<<");
 
+			loadKeyPairs();
+
 			// Database
 			System.out.println("Setting up database connection on " + dbUrl);
 			Class.forName(DATABASE_DRIVER);
@@ -111,9 +122,32 @@ public class BackofficeMain {
 			System.out.println("ERROR: Could not connect to database: " + e.getMessage());
 		} catch (ClassNotFoundException e) {
 			System.out.println("ERROR: Database class not found: " + e.getMessage());
+		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {
+			System.out.println("ERROR: Could not load compartment keys from JavaKeyStore: " + e.getMessage());
 		} finally {
 			System.out.println("Exiting...");
 		}
+	}
+
+	private static void loadKeyPairs() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
+		IOException, UnrecoverableKeyException  {
+		PrivateKey privateKey;
+		PublicKey publicKey;
+
+		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
+
+		// Account Management
+		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
+		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT).getPublicKey();
+		accountManagementKeyPair = new KeyPair(publicKey, privateKey);
+
+		// Energy Management
+		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ENERGY_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
+		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_ENERGY_MANAGEMENT).getPublicKey();
+		energyManagementKeyPair = new KeyPair(publicKey, privateKey);
+
+		System.out.println("Successfully loaded key pairs from JavaKeyStore!");
 	}
 
 	private static void setupDatabase() {
@@ -166,4 +200,6 @@ public class BackofficeMain {
 		st.executeUpdate();
 		st.close();
 	}
+
+
 }
