@@ -40,6 +40,8 @@
 		<module>security</module>
 		<module>webserver-contract</module>
 		<module>webserver</module>
+		<module>rbac-contract</module>
+		<module>rbac</module>
 		<module>backoffice-contract</module>
 		<module>backoffice</module>
 		<module>client</module>

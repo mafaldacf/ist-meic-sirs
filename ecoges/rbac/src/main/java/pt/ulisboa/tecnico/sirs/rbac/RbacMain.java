@@ -1,4 +1,4 @@
-package pt.ulisboa.tecnico.sirs.backoffice;
+package pt.ulisboa.tecnico.sirs.rbac;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -11,23 +11,34 @@ import io.grpc.Server;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.WebserverBackofficeServiceGrpc;
+
+// STAY?
+//import pt.ulisboa.tecnico.sirs.webserver.grpc.WebserverBackofficeServiceGrpc;
 
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 
-import static pt.ulisboa.tecnico.sirs.backoffice.DatabaseQueries.*;
+import static pt.ulisboa.tecnico.sirs.rbac.DatabaseQueries.*;
 
-public class BackofficeMain {
+public class RbacMain {
 
 	private static int serverPort = 8001;
+
+	// Data compartments
+	private static final String KEY_STORE_FILE = "src/main/resources/backoffice.keystore";
+	private static final String KEY_STORE_PASSWORD = "backoffice";
+	private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
+	private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
+
+	private static KeyPair accountManagementKeyPair;
+	private static KeyPair energyManagementKeyPair;
 
 	// TLS
 	private static InputStream cert;
 	private static InputStream key;
 
-	private static final String CERTIFICATE_PATH = "../tlscerts/backoffice.crt";
-	private static final String KEY_PATH = "../tlscerts/backoffice.pem";
+	private static final String CERTIFICATE_PATH = "../tlscerts/rbac.crt";
+	private static final String KEY_PATH = "../tlscerts/rbac.pem";
 
 	// Database
 
@@ -45,6 +56,7 @@ public class BackofficeMain {
 	private static int webserverPort = 8000;
 
 	private static WebserverBackofficeServiceGrpc.WebserverBackofficeServiceBlockingStub webserver;
+
 
 	// Usage: <serverPort> <webserverHost> <webserverPort> <databaseHost> <databasePort>
 	public static void main(String[] args) {
@@ -85,7 +97,9 @@ public class BackofficeMain {
 
 		try {
 			SslContext sslContext = GrpcSslContexts.forServer(cert, key).build();
-			System.out.println(">>> " + BackofficeMain.class.getSimpleName() + " <<<");
+			System.out.println(">>> " + RbacMain.class.getSimpleName() + " <<<");
+
+			loadKeyPairs();
 
 			// Database
 			System.out.println("Setting up database connection on " + dbUrl);
@@ -94,10 +108,9 @@ public class BackofficeMain {
 			if (dbConnection != null) setupDatabase();
 
 			// Services
-			Backoffice backofficeServer = new Backoffice(dbConnection, webserverHost, webserverPort);
+			Rbac rbacServer = new Rbac(dbConnection, webserverHost, webserverPort);
 			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext)
-					.addService(new BackofficeServiceImpl(backofficeServer))
-					.build();
+					.addService(new RbacServiceImpl(rbacServer)).build();
 			server.start();
 			System.out.println("Listening on port " + serverPort + "...");
 
@@ -111,59 +124,32 @@ public class BackofficeMain {
 			System.out.println("ERROR: Could not connect to database: " + e.getMessage());
 		} catch (ClassNotFoundException e) {
 			System.out.println("ERROR: Database class not found: " + e.getMessage());
+		} catch (UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {
+			System.out.println("ERROR: Could not load compartment keys from JavaKeyStore: " + e.getMessage());
 		} finally {
 			System.out.println("Exiting...");
 		}
 	}
 
-	private static void setupDatabase() {
-		Statement statement;
+	private static void loadKeyPairs() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
+			IOException, UnrecoverableKeyException {
+		PrivateKey privateKey;
+		PublicKey publicKey;
 
-		try {
-			statement = dbConnection.createStatement();
-			statement.execute(DROP_PERMISSION_TABLE);
-			statement.execute(DROP_ADMIN_TABLE);
-
-
-			statement = dbConnection.createStatement();
-			statement.execute(CREATE_ADMIN_TABLE);
-			statement.execute(CREATE_PERMISSION_TABLE);
-
-			generatePermissions();
-
-			System.out.println("Database is ready!");
-		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e) {
-			System.out.println("Could not set up database: "+ e.getMessage());
-			System.exit(1);
-		}
-	}
-
-	public static void generatePermissions() throws SQLException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
-		PreparedStatement st;
-		ResultSet rs;
-
-		// Check if permissions already exist
-		st = dbConnection.prepareStatement(READ_PERMISSION_COUNT);
-		rs = st.executeQuery();
-
-		if (rs.next() && rs.getInt(1) != 0){
-			st.close();
-			return;
-		}
-		st.close();
+		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
 
 		// Account Management
-		st = dbConnection.prepareStatement(CREATE_ACCOUNT_MANAGER_PERMISSION);
-		st.setBoolean(1, true); // personal info
-		st.setBoolean(2, false); // energy panel
-		st.executeUpdate();
-		st.close();
+		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
+		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT).getPublicKey();
+		accountManagementKeyPair = new KeyPair(publicKey, privateKey);
 
 		// Energy Management
-		st = dbConnection.prepareStatement(CREATE_ENERGY_MANAGER_PERMISSION);
-		st.setBoolean(1, false); // personal info
-		st.setBoolean(2, true); // energy panel
-		st.executeUpdate();
-		st.close();
+		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ENERGY_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
+		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_ENERGY_MANAGEMENT).getPublicKey();
+		energyManagementKeyPair = new KeyPair(publicKey, privateKey);
+
+		System.out.println("Successfully loaded key pairs from JavaKeyStore!");
 	}
+
 }
