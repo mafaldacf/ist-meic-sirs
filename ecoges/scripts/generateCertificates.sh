@@ -2,9 +2,10 @@
 
 # Clean previous keys and certificates
 rm -rf *.crt *.csr *.key *.srl *.p12 *.keystore
-rm ../tlscerts/*
-rm ../webserver/src/main/resources/*
-rm ../backoffice/src/main/resources/*
+rm -rf ../tlscerts/*
+rm -rf ../webserver/src/main/resources/*
+rm -rf ../backoffice/src/main/resources/*
+rm -rf ../rbac/src/main/resources/*
 
 # Generate CA key and certificate
 openssl genrsa -out ca.key
@@ -28,6 +29,7 @@ createTLSCertificates() { # Arguments: $1 -> name
 createTLSCertificates webserver
 createTLSCertificates backoffice
 createTLSCertificates database
+createTLSCertificates rbac-server
 
 cp ca.crt ../tlscerts/
 
@@ -44,24 +46,28 @@ createKeyStores() { # Arguments: $1 -> name; $2 -> unit
 
     openssl pkcs12 -password pass:$1 -export -in $2.crt -inkey $2.key -out $2.p12 -name $2 -CAfile ca.crt -caname root
     keytool -importkeystore -deststorepass $1 -destkeypass $1 -destkeystore $1.keystore -srckeystore $2.p12 -srcstoretype PKCS12 -srcstorepass $1 -alias $2
-    rm $2.p12 $2.key $2.crt
+    rm $2.p12 $2.key
 }
 
 createKeyStores webserver webserver
 createKeyStores backoffice accountmanagement
 createKeyStores backoffice energyManagement
+createKeyStores rbac-server rbac-server
 
 createTrustedStores() { # Arguments: $1 -> name $2 -> alias
-    keytool -import -trustcacerts -file ca.crt -alias $2 -keystore $1.truststore -storepass $1 -noprompt
+    keytool -import -trustcacerts -file $2.crt -alias $2 -keystore $1.truststore -storepass $1 -noprompt
 }
 
 createTrustedStores webserver ca
 createTrustedStores backoffice ca
+createTrustedStores rbac-server ca
+createTrustedStores webserver rbac-server
 
 mv webserver.keystore webserver.truststore ../webserver/src/main/resources/
 mv backoffice.keystore backoffice.truststore ../backoffice/src/main/resources/
+mv rbac-server.keystore rbac-server.truststore ../rbac/src/main/resources/
 
 echo ""
 echo "done!"
 
-rm ca.key ca.crt
+rm ca.key *.crt

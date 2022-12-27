@@ -116,3 +116,5 @@ buildNumber.properties
 ecoges/.vscode/
 
 # End of https://www.toptal.com/developers/gitignore/api/maven,java,eclipse
+ecoges/.idea/compiler.xml
+ecoges/.idea/encodings.xml
