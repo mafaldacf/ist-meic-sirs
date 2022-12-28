@@ -12,6 +12,7 @@ import pt.ulisboa.tecnico.sirs.webserver.grpc.Compartment;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.GetCompartmentKeyRequest;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.GetCompartmentKeyResponse;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.WebserverBackofficeServiceGrpc;
+import pt.ulisboa.tecnico.sirs.rbac.grpc.*;
 
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
@@ -33,6 +34,7 @@ public class Backoffice {
 
     private static final String WEBSERVER_CERTIFICATE_PATH = "../tlscerts/webserver.crt";
     private final WebserverBackofficeServiceGrpc.WebserverBackofficeServiceBlockingStub webserver;
+    private final RbacServiceGrpc.RbacServiceBlockingStub rbacserver;
 
     // Data compartments
     private static final String KEY_STORE_FILE = "src/main/resources/backoffice.keystore";
@@ -40,7 +42,7 @@ public class Backoffice {
     private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
     private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
 
-    public Backoffice(Connection dbConnection, String webserverHost, int webserverPort) throws IOException {
+    public Backoffice(Connection dbConnection, String webserverHost, int webserverPort, String rbacHost, int rbacPort) throws IOException {
 
         this.dbConnection = dbConnection;
 
@@ -49,6 +51,11 @@ public class Backoffice {
         ManagedChannel channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
         webserver = WebserverBackofficeServiceGrpc.newBlockingStub(channel);
 
+        String targetRbac = rbacHost + ":" + rbacPort;
+		InputStream certRbac = Files.newInputStream(Paths.get("../tlscerts/rbac-server.crt"));
+
+		ManagedChannel channelRbac = NettyChannelBuilder.forTarget(targetRbac).sslContext(GrpcSslContexts.forClient().trustManager(certRbac).build()).build();
+		rbacserver = RbacServiceGrpc.newBlockingStub(channel);
     }
 
     /*
@@ -263,9 +270,30 @@ public class Backoffice {
         PersonalInfo personalInfo;
         PreparedStatement st;
         ResultSet rs;
+        String role;
 
         validateSession(username, hashedToken);
-        String role = validatePermissions(username, READ_PERMISSION_PERSONAL_INFO);
+        // TODO: chamar função do Rbac here
+        st = dbConnection.prepareStatement(READ_ADMIN_ROLE);
+        st.setString(1, username);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            role = rs.getString(1);
+        }
+        else {
+            throw new AdminDoesNotExistException(username);
+        }
+
+        //TODO: FZR FUNÇÃO PARA TORNAR ISTO DINAMICO 
+        ValidatePermissionRequest request = ValidatePermissionRequest.newBuilder()
+            .setRole(Role.valueOf(role))
+            .setPermission(PermissionType.PERSONAL_DATA)
+            .build();
+
+        ValidatePermissionResponse response = rbacserver.validatePermissions(request);
+
+        st.close();
 
         String personalInfoKeyString = requestCompartmentKey(Compartment.PERSONAL_INFO, role).toString();
 
@@ -313,9 +341,30 @@ public class Backoffice {
         List<SolarPanel> solarPanels;
         PreparedStatement st;
         ResultSet rs;
+        String role;
 
         validateSession(username, hashedToken);
-        String role = validatePermissions(username, READ_PERMISSION_ENERGY_PANEL);
+        
+        st = dbConnection.prepareStatement(READ_ADMIN_ROLE);
+        st.setString(1, username);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            role = rs.getString(1);
+        }
+        else {
+            throw new AdminDoesNotExistException(username);
+        }
+
+        //TODO: FZR FUNÇÃO PARA TORNAR ISTO DINAMICO 
+        ValidatePermissionRequest request = ValidatePermissionRequest.newBuilder()
+            .setRole(Role.valueOf(role))
+            .setPermission(PermissionType.ENERGY_DATA)
+            .build();
+
+        ValidatePermissionResponse response = rbacserver.validatePermissions(request);
+
+        st.close();
 
         String energyPanelKeyString = requestCompartmentKey(Compartment.ENERGY_PANEL, role).toString();
 

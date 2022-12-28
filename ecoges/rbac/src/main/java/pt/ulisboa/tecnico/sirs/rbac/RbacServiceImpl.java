@@ -21,5 +21,21 @@ public class RbacServiceImpl extends RbacServiceGrpc.RbacServiceImplBase {
 		server = rbacServer;
 	}
 
+	@Override
+	public void validatePermissions(ValidatePermissionRequest request, StreamObserver<ValidatePermissionResponse> responseObserver) {
+		ValidatePermissionResponse.Builder builder = ValidatePermissionResponse.newBuilder();
+		try {
+			server.validatePermissions(request.getRole(), request.getPermission());
+
+			builder.setAck(true);
+
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (PermissionDeniedException e){
+			responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());
+		} catch (InvalidRoleException e){
+			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		}
+	}
 
 }

@@ -53,12 +53,15 @@ public class BackofficeMain {
 	private static String webserverHost = "localhost";
 	private static int webserverPort = 8000;
 
-	private static WebserverBackofficeServiceGrpc.WebserverBackofficeServiceBlockingStub webserver;
+	// Rbac
 
-	// Usage: <serverPort> <webserverHost> <webserverPort> <databaseHost> <databasePort>
+	private static String rbacHost = "localhost";
+	private static int rbacPort = 8002;
+
+	// Usage: <serverPort> <webserverHost> <webserverPort> <databaseHost> <databasePort> <rbacHost> <rbacPort>
 	public static void main(String[] args) {
 		try {
-			if (args.length == 5) {
+			if (args.length == 7) {
 				// server
 				serverPort = Integer.parseInt(args[0]);
 
@@ -68,8 +71,12 @@ public class BackofficeMain {
 
 				// database
 				String dbHost = args[3];
-				int dbPort = Integer.parseInt(args[2]);
+				int dbPort = Integer.parseInt(args[4]);
 				dbUrl = "jdbc:mysql://" + dbHost + ":" + dbPort + "/clientdb";
+
+				// rbac			
+				rbacHost = args[5];
+				rbacPort = Integer.parseInt(args[6]);
 			}
 
 		} catch (NumberFormatException e) {
@@ -105,7 +112,7 @@ public class BackofficeMain {
 			if (dbConnection != null) setupDatabase();
 
 			// Services
-			Backoffice backofficeServer = new Backoffice(dbConnection, webserverHost, webserverPort);
+			Backoffice backofficeServer = new Backoffice(dbConnection, webserverHost, webserverPort, rbacHost, rbacPort);
 			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext)
 					.addService(new BackofficeServiceImpl(backofficeServer))
 					.build();

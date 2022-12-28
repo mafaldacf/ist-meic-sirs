@@ -7,80 +7,24 @@ package pt.ulisboa.tecnico.sirs.rbac.grpc;
 option java_multiple_files = true;
 
 service RbacService {
-	rpc checkPersonalInfo(CheckPersonalInfoRequest) returns (CheckPersonalInfoResponse);
-	rpc checkEnergyPanel(CheckEnergyPanelRequest) returns (CheckEnergyPanelResponse);
+	rpc validatePermissions(ValidatePermissionRequest) returns (ValidatePermissionResponse);
 }
 
-enum PlanType {
-	FLAT_RATE = 0;
-	BI_HOURLY_RATE = 1;
-}
-
-enum RoleType {
+enum Role {
 	ACCOUNT_MANAGER = 0;
 	ENERGY_MANAGER = 1;
 }
 
-message AckResponse {
+enum PermissionType {
+	ENERGY_DATA = 0;
+	PERSONAL_DATA = 1;
+}
+
+message ValidatePermissionRequest {
+	Role role = 1;
+	PermissionType permission = 2;
+}
+
+message ValidatePermissionResponse {
 	bool ack = 1;
-}
-
-message Client {
-	string name = 1;
-	string email = 2;
-}
-
-// Check personal info
-
-message PersonalInfo {
-	string name = 1;
-	string email = 2;
-	string address = 3;
-	string IBAN = 4;
-	PlanType plan = 5;
-}
-
-message CheckPersonalInfoRequest {
-	string username = 1;
-	string email = 2;
-	string hashedToken = 3;
-}
-
-message CheckPersonalInfoResponse {
-	PersonalInfo personalInfo = 1;
-}
-
-// Check energy panel
-
-message EnergyPanel {
-	float energyConsumed = 1;
-	float energyConsumedDaytime = 2;
-	float energyConsumedNight = 3;
-	float energyProduced = 4;
-	repeated Appliance appliances = 5;
-	repeated SolarPanel solarPanels = 6;
-}
-
-message SolarPanel {
-	string name = 1;
-	string brand = 2;
-	float energyProduced = 3;
-}
-
-message Appliance {
-	string name = 1;
-	string brand = 2;
-	float energyConsumed = 3;
-	float energyConsumedDaytime = 4;
-	float energyConsumedNight = 5;
-}
-
-message CheckEnergyPanelRequest {
-	string username = 1;
-	string email = 2;
-	string hashedToken = 3;
-}
-
-message CheckEnergyPanelResponse {
-	EnergyPanel energyPanel = 1;
 }
