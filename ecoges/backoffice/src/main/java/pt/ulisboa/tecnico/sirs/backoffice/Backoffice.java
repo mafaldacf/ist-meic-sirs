@@ -5,6 +5,8 @@ import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.*;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
@@ -30,23 +32,36 @@ import static pt.ulisboa.tecnico.sirs.backoffice.DatabaseQueries.*;
 
 public class Backoffice {
     private final Connection dbConnection;
-
-    private static final String WEBSERVER_CERTIFICATE_PATH = "../tlscerts/webserver.crt";
     private final WebserverBackofficeServiceGrpc.WebserverBackofficeServiceBlockingStub webserver;
+
+    // TLS
+    private static final String TRUST_STORE_FILE = "src/main/resources/backoffice.truststore";
+    private static final String TRUST_STORE_PASSWORD = "mypassbackoffice";
+    private static final String TRUST_STORE_ALIAS_CA = "ca";
+    private static final String TRUST_STORE_ALIAS_WEBSERVER = "webserver";
 
     // Data compartments
     private static final String KEY_STORE_FILE = "src/main/resources/backoffice.keystore";
-    private static final String KEY_STORE_PASSWORD = "backoffice";
+    private static final String KEY_STORE_PASSWORD = "mypassbackoffice";
     private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
     private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
 
-    public Backoffice(Connection dbConnection, String webserverHost, int webserverPort) throws IOException {
-
+    public Backoffice(Connection dbConnection, String webserverHost, int webserverPort) throws IOException, KeyStoreException, CertificateException, NoSuchAlgorithmException {
         this.dbConnection = dbConnection;
 
         String target = webserverHost + ":" + webserverPort;
-        InputStream cert = Files.newInputStream(Paths.get(WEBSERVER_CERTIFICATE_PATH));
-        ManagedChannel channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
+
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        trustStore.load(Files.newInputStream(Paths.get(TRUST_STORE_FILE)), TRUST_STORE_PASSWORD.toCharArray());
+        X509Certificate CACertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_CA);
+        X509Certificate webserverCertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_WEBSERVER);
+
+        // Setup ssl context
+        SslContext sslContext = GrpcSslContexts.configure(SslContextBuilder.forClient()
+                .trustManager(webserverCertificate, CACertificate))
+                .build();
+
+        ManagedChannel channel = NettyChannelBuilder.forTarget(target).sslContext(sslContext).build();
         webserver = WebserverBackofficeServiceGrpc.newBlockingStub(channel);
 
     }

@@ -3,24 +3,45 @@ import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Admin {
+
 	private static ManagedChannel channel;
 	private static BackofficeServiceGrpc.BackofficeServiceBlockingStub server;
 
-	public static void init(String host, int port) throws IOException {
-		String target = host + ":" + port;
-		InputStream cert = Files.newInputStream(Paths.get("../tlscerts/backoffice.crt"));
+	// TLS
+	private static final String TRUST_STORE_FILE = "src/main/resources/admin.truststore";
+	private static final String TRUST_STORE_PASSWORD = "mypassadmin";
+	private static final String TRUST_STORE_ALIAS_CA = "ca";
+	private static final String TRUST_STORE_ALIAS_BACKOFFICE = "backoffice";
 
-		channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
+	public static void init(String host, int port) throws IOException, CertificateException, NoSuchAlgorithmException, KeyStoreException {
+		String target = host + ":" + port;
+
+		KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		trustStore.load(Files.newInputStream(Paths.get(TRUST_STORE_FILE)), TRUST_STORE_PASSWORD.toCharArray());
+		X509Certificate CACertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_CA);
+		X509Certificate webserverCertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_BACKOFFICE);
+
+		// Setup ssl context
+		SslContext sslContext = GrpcSslContexts.configure(SslContextBuilder.forClient().trustManager(webserverCertificate, CACertificate)).build();
+
+		channel = NettyChannelBuilder.forTarget(target).sslContext(sslContext).build();
 		server = BackofficeServiceGrpc.newBlockingStub(channel);
 	}
 

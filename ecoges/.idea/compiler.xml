@@ -8,27 +8,19 @@
         <outputRelativeToContentRoot value="true" />
         <module name="backoffice" />
         <module name="security" />
-        <module name="client" />
         <module name="admin" />
+        <module name="client" />
         <module name="webserver-contract" />
         <module name="webserver" />
         <module name="backoffice-contract" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="contract" target="11" />
-      <module name="employee" target="9" />
-      <module name="server" target="9" />
-      <module name="server-contract" target="11" />
-    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="admin" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="backoffice" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="client" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
-      <module name="employee" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
-      <module name="server" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="webserver" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
     </option>
   </component>

@@ -3,23 +3,45 @@ import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.List;
 
 public class Client {
+
 	private static ManagedChannel channel;
 	private static WebserverServiceGrpc.WebserverServiceBlockingStub server;
 
-	public static void init(String host, int port) throws IOException {
-		String target = host + ":" + port;
-		InputStream cert = Files.newInputStream(Paths.get("../tlscerts/webserver.crt"));
+	// TLS
+	private static final String TRUST_STORE_FILE = "src/main/resources/client.truststore";
+	private static final String TRUST_STORE_PASSWORD = "mypassclient";
+	private static final String TRUST_STORE_ALIAS_CA = "ca";
+	private static final String TRUST_STORE_ALIAS_WEBSERVER = "webserver";
 
-		channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
+	public static void init(String host, int port) throws IOException, KeyStoreException, CertificateException, NoSuchAlgorithmException {
+		String target = host + ":" + port;
+
+		KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		trustStore.load(Files.newInputStream(Paths.get(TRUST_STORE_FILE)), TRUST_STORE_PASSWORD.toCharArray());
+		X509Certificate CACertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_CA);
+		X509Certificate webserverCertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_WEBSERVER);
+
+		// Setup ssl context
+		SslContext sslContext = GrpcSslContexts.configure(SslContextBuilder.forClient().trustManager(webserverCertificate, CACertificate)).build();
+
+		channel = NettyChannelBuilder.forTarget(target).sslContext(sslContext).build();
 		server = WebserverServiceGrpc.newBlockingStub(channel);
 	}
 
