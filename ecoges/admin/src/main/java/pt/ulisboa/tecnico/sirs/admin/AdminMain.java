@@ -1,6 +1,12 @@
 package pt.ulisboa.tecnico.sirs.admin;
 
+import pt.ulisboa.tecnico.sirs.security.Security;
+import pt.ulisboa.tecnico.sirs.security.exceptions.WeakPasswordException;
+
 import java.io.IOException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.List;
 import java.util.Scanner;
 
@@ -33,7 +39,7 @@ public class AdminMain {
 		try {
 			Admin.init(serverHost, serverPort);
 			showInterface();
-		} catch (IOException e) {
+		} catch (IOException | CertificateException | KeyStoreException | NoSuchAlgorithmException e) {
 			System.out.println("Could not start admin. Invalid backoffice certificate.");
 		}
 	}
@@ -46,19 +52,21 @@ public class AdminMain {
 		username = scanner.nextLine();
 
 		//System.out.print("Enter your strong password (10 to 30 characters and at least: 1 uppercase, 1 lowercase, 1 digit and 1 special character): ");
-
-		System.out.print("Enter your password: ");
+		System.out.print("Enter your password:");
 		password = scanner.nextLine();
-		/* while(true) {
+
+		/*
+		while(true) {
 			try {
 				password = scanner.nextLine();
-				Crypto.verifyStrongPassword(password);
+				Security.verifyStrongPassword(password);
 				break;
 			} catch (WeakPasswordException e) {
 				System.out.println(e.getMessage());
 				System.out.print("Enter your strong password again: ");
 			}
-		} */
+		}
+		*/
 
 		int role = getRole();
 		if (Admin.register(username, password, role)) {

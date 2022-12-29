@@ -1,6 +1,9 @@
 package pt.ulisboa.tecnico.sirs.client;
 
 import java.io.IOException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -32,7 +35,7 @@ public class ClientMain {
 		try {
 			Client.init(serverHost, serverPort);
 			showInterface();
-		} catch (IOException e) {
+		} catch (IOException | CertificateException | KeyStoreException | NoSuchAlgorithmException e) {
 			System.out.println("Could not start client. Invalid webserver certificate.");
 		}
 	}

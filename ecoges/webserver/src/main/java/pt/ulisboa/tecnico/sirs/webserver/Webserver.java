@@ -34,7 +34,7 @@ public class Webserver {
 
     // Trust Store
     private static final String TRUST_STORE_FILE = "src/main/resources/webserver.truststore";
-    private static final String TRUST_STORE_PASSWORD = "webserver";
+    private static final String TRUST_STORE_PASSWORD = "mypasswebserver";
     private static final String TRUST_STORE_ALIAS_CA = "ca";
 
     // Compartments
