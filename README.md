@@ -168,16 +168,16 @@ Change `bind-address` field to desired `<databaseHost>` of database (e.g. `192.1
 To configure TLS, copy keys and certificates:
 
     cd SIRS/ecoges
-    sudo mkdir /etc/mysql/tlscerts
-    sudo cp tlscerts/ca.crt /etc/mysql/tlscerts/ca.crt
-    sudo cp tlscerts/database.crt /etc/mysql/tlscerts/database.crt
-    sudo cp tlscerts/database.key /etc/mysql/tlscerts/database.key
+    sudo mkdir /etc/mysql/databaseTLS
+    sudo cp databaseTLS/ca.crt /etc/mysql/databaseTLS/ca.crt
+    sudo cp databaseTLS/database.crt /etc/mysql/databaseTLS/database.crt
+    sudo cp databaseTLS/database.key /etc/mysql/databaseTLS/database.key
 
 > **TIP: make sure these keys and certificates have root permissions, otherwise, MySQL won't be able to use SSL!**
 >
->    \> **`chmod 777 /etc/mysql/tlscerts/ca.crt`**
->    \> **`chmod 777 /etc/mysql/tlscerts/database.crt`**
->    \> **`chmod 777 /etc/mysql/tlscerts/database.key`**
+>    \> **`chmod 777 /etc/mysql/databaseTLS/ca.crt`**
+>    \> **`chmod 777 /etc/mysql/databaseTLS/database.crt`**
+>    \> **`chmod 777 /etc/mysql/databaseTLS/database.key`**
 
 Append the following content to `/etc/mysql/my.cnf` file:
 
@@ -185,9 +185,9 @@ Append the following content to `/etc/mysql/my.cnf` file:
         [mysqld]
         ssl=1
         ssl-cipher=DHE-RSA-AES256-SHA
-        ssl-ca=/etc/mysql/tlscerts/ca.crt
-        ssl-cert=/etc/mysql/tlscerts/database.crt
-        ssl-key=/etc/mysql/tlscerts/database.key
+        ssl-ca=/etc/mysql/databaseTLS/ca.crt
+        ssl-cert=/etc/mysql/databaseTLS/database.crt
+        ssl-key=/etc/mysql/databaseTLS/database.key
 
 Verify if everything is ok, having the following field values: `have_openssl` = `YES`:
 
@@ -211,22 +211,27 @@ For each machine, compile and run the project:
     cd ecoges
     mvn clean compile install -DskipTests
 
-Run webserver on port `<serverPort>` (e.g. `8000`) and communicate with database on `<databaseHost>` (e.g. `localhost` for development or `192.168.1.2`) with port `<databasePort>` (e.g. `3306`):
+Run **webserver** on port `<serverPort>` (e.g. `8000`) and communicate with database on `<databaseHost>` (e.g. `localhost` for development or `192.168.1.2`) with port `<databasePort>` (e.g. `3306`):
 
     cd ecoges/webserver
     mvn exec:java -Dexec.args="8000 192.168.1.2 3306"
 
-Run client to communicate with webserver on `<serverHost>` (e.g. `localhost` for development; firewall public IP `10.0.2.4`) and port `<serverPort>` (e.g. `8000`):
+Run **client** to communicate with webserver on `<serverHost>` (e.g. `localhost` for development; firewall public IP `10.0.2.4`) and port `<serverPort>` (e.g. `8000`):
 
     cd ecoges/client
     mvn exec:java -Dexec.args="10.0.2.4 8000"
 
-Run backoffice on port `<serverPort>` (e.g. `8001`) and communicate with database on `<databaseHost>` (e.g. `localhost` for development or `192.168.1.2`) with port `<databasePort>` (e.g. `3306`):
+Run **rbac** on port `<serverPort>` (e.g. `8002`):
 
     cd ecoges/backoffice
-    mvn exec:java -Dexec.args="8000 192.168.1.2 3306"
+    mvn exec:java -Dexec.args="8002"
 
-Run admin to communicate with backoffice on `<serverHost>` (e.g. `localhost` for development; `192.168.2.2`) and port `<serverPort>` (e.g. `8001`):
+Run **backoffice** on port `<serverPort>` (e.g. `8001`) and communicate with database on `<databaseHost>` (e.g. `localhost` for development or `192.168.1.2`) with port `<databasePort>` (e.g. `3306`). Additionally, communicate with rbac on localhost:8002
+
+    cd ecoges/backoffice
+    mvn exec:java -Dexec.args="8000 192.168.1.2 3306 localhost 8002"
+
+Run **admin** to communicate with backoffice on `<serverHost>` (e.g. `localhost` for development; `192.168.2.2`) and port `<serverPort>` (e.g. `8001`):
 
     cd ecoges/admin
     mvn exec:java -Dexec.args="192.168.2.2 8001"

@@ -7,7 +7,6 @@ import javax.crypto.*;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.cert.*;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -110,7 +109,7 @@ public class Security {
         return signer.verify(signedMessage);
     }
 
-    public static void validateCertificateChain(X509Certificate certificate, X509Certificate CACertificate) throws CertificateException, InvalidAlgorithmParameterException, NoSuchAlgorithmException, CertPathValidatorException {
+    public static boolean validateCertificateChain(X509Certificate certificate, X509Certificate CACertificate) throws CertificateException, InvalidAlgorithmParameterException, NoSuchAlgorithmException {
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
 
         CertPath cp = cf.generateCertPath(Collections.singletonList((certificate)));
@@ -126,7 +125,12 @@ public class Security {
         CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
 
         // Validate the certificate chain
-        cpv.validate(cp, params);
+        try {
+            cpv.validate(cp, params);
+        } catch (CertPathValidatorException e) {
+            return false;
+        }
+        return true;
     }
 
 

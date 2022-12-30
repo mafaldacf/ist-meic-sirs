@@ -55,8 +55,9 @@ public class Webserver {
 
     public byte[] getCompartmentKey(GetCompartmentKeyRequest.RequestData data, ByteString signature) throws CompartmentKeyException,
             IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException,
-            InvalidKeySpecException, CertificateException, SignatureException, InvalidSignatureException,
-            BadPaddingException, InvalidHashException, KeyStoreException, IOException, InvalidAlgorithmParameterException, CertPathValidatorException {
+            InvalidKeySpecException, SignatureException, InvalidSignatureException, BadPaddingException,
+            KeyStoreException, IOException, InvalidAlgorithmParameterException,
+            InvalidCertificateChainException, CertificateException {
 
         Compartment compartment = data.getCompartment();
         byte[] certificateBytes = data.getCertificate().toByteArray();
@@ -75,7 +76,9 @@ public class Webserver {
         trustStore.load(Files.newInputStream(Paths.get(TRUST_STORE_FILE)), TRUST_STORE_PASSWORD.toCharArray());
         X509Certificate CACertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_CA);
 
-        Security.validateCertificateChain(departmentCertificate, CACertificate);
+        if (!Security.validateCertificateChain(departmentCertificate, CACertificate)) {
+            throw new InvalidCertificateChainException();
+        }
 
         // TODO: Validate signature of access control infrastructure (the response should be signed)
 
