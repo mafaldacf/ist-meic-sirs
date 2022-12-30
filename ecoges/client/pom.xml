@@ -121,7 +121,7 @@
 				<version>${version.maven-resources-plugin}</version>
 				<configuration>
 					<nonFilteredFileExtensions>
-						<nonFilteredFileExtension>jks</nonFilteredFileExtension>
+						<nonFilteredFileExtension>truststore</nonFilteredFileExtension>
 					</nonFilteredFileExtensions>
 				</configuration>
 			</plugin>

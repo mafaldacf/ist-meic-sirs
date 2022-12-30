@@ -8,6 +8,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="backoffice" />
         <module name="security" />
+        <module name="rbac" />
         <module name="client" />
         <module name="admin" />
         <module name="webserver-contract" />
@@ -28,6 +29,7 @@
       <module name="backoffice" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="client" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="employee" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
+      <module name="rbac" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="server" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="webserver" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
     </option>

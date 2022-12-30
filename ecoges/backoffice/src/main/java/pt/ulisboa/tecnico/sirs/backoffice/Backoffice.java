@@ -5,6 +5,8 @@ import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.*;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
@@ -31,31 +33,52 @@ import static pt.ulisboa.tecnico.sirs.backoffice.DatabaseQueries.*;
 
 public class Backoffice {
     private final Connection dbConnection;
-
-    private static final String WEBSERVER_CERTIFICATE_PATH = "../tlscerts/webserver.crt";
     private final WebserverBackofficeServiceGrpc.WebserverBackofficeServiceBlockingStub webserver;
     private final RbacServiceGrpc.RbacServiceBlockingStub rbacserver;
 
+    // TLS
+    private static final String TRUST_STORE_FILE = "src/main/resources/backoffice.truststore";
+    private static final String TRUST_STORE_PASSWORD = "mypassbackoffice";
+    private static final String TRUST_STORE_ALIAS_CA = "ca";
+    private static final String TRUST_STORE_ALIAS_WEBSERVER = "webserver";
+    private static final String TRUST_STORE_ALIAS_RBAC = "rbac";
+
     // Data compartments
     private static final String KEY_STORE_FILE = "src/main/resources/backoffice.keystore";
-    private static final String KEY_STORE_PASSWORD = "backoffice";
+    private static final String KEY_STORE_PASSWORD = "mypassbackoffice";
     private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
     private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
 
-    public Backoffice(Connection dbConnection, String webserverHost, int webserverPort, String rbacHost, int rbacPort) throws IOException {
-
+    public Backoffice(Connection dbConnection, String webserverHost, int webserverPort, String rbacHost, int rbacPort) throws IOException, KeyStoreException, CertificateException, NoSuchAlgorithmException {
         this.dbConnection = dbConnection;
 
         String target = webserverHost + ":" + webserverPort;
-        InputStream cert = Files.newInputStream(Paths.get(WEBSERVER_CERTIFICATE_PATH));
-        ManagedChannel channel = NettyChannelBuilder.forTarget(target).sslContext(GrpcSslContexts.forClient().trustManager(cert).build()).build();
+        String targetRbac = rbacHost + ":" + rbacPort;
+
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        trustStore.load(Files.newInputStream(Paths.get(TRUST_STORE_FILE)), TRUST_STORE_PASSWORD.toCharArray());
+
+        X509Certificate CACertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_CA);
+        X509Certificate webserverCertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_WEBSERVER);
+        X509Certificate rbacCertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_RBAC);
+
+        // Setup ssl context for webserver connection
+        SslContext sslContext = GrpcSslContexts.configure(SslContextBuilder.forClient()
+                        .trustManager(webserverCertificate, CACertificate)).build();
+
+        ManagedChannel channel = NettyChannelBuilder.forTarget(target).sslContext(sslContext).build();
         webserver = WebserverBackofficeServiceGrpc.newBlockingStub(channel);
 
-        String targetRbac = rbacHost + ":" + rbacPort;
-		InputStream certRbac = Files.newInputStream(Paths.get("../tlscerts/rbac-server.crt"));
+        System.out.println("Connected to webserver on " + target);
 
-		ManagedChannel channelRbac = NettyChannelBuilder.forTarget(targetRbac).sslContext(GrpcSslContexts.forClient().trustManager(certRbac).build()).build();
-		rbacserver = RbacServiceGrpc.newBlockingStub(channelRbac);
+        // Setup ssl context for rbac connection
+        SslContext sslContextRbac = GrpcSslContexts.configure(SslContextBuilder.forClient()
+                .trustManager(rbacCertificate, CACertificate)).build();
+
+        ManagedChannel channelRbac = NettyChannelBuilder.forTarget(targetRbac).sslContext(sslContextRbac).build();
+        rbacserver = RbacServiceGrpc.newBlockingStub(channelRbac);
+
+        System.out.println("Connected to rbac on " + targetRbac);
     }
 
     /*
@@ -294,12 +317,11 @@ public class Backoffice {
             role = rs.getString(1);
         }
         else {
+            st.close();
             throw new AdminDoesNotExistException(username);
         }
 
         validatePermission(role, PermissionType.PERSONAL_DATA);
-
-        st.close();
 
         String personalInfoKeyString = requestCompartmentKey(Compartment.PERSONAL_INFO, role).toString();
 
@@ -359,12 +381,11 @@ public class Backoffice {
             role = rs.getString(1);
         }
         else {
+            st.close();
             throw new AdminDoesNotExistException(username);
         }
 
         validatePermission(role, PermissionType.ENERGY_DATA);
-
-        st.close();
 
         String energyPanelKeyString = requestCompartmentKey(Compartment.ENERGY_PANEL, role).toString();
 

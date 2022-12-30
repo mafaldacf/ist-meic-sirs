@@ -5,13 +5,14 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
 import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.sql.*;
 import java.util.*;
 
 import io.grpc.Server;
 import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.PlanType;
 
@@ -20,31 +21,28 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
+import static io.grpc.netty.NettyServerBuilder.*;
 import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
 
 public class WebserverMain {
 
-	private static Webserver webserver;
+	private static KeyPair keyPair;
 
-	private static boolean gotCompartmentKeys = false;
-
-	// Data compartments
+	private static X509Certificate certificate;
+	private static X509Certificate CACertificate;
 	private static final String KEY_STORE_FILE = "src/main/resources/webserver.keystore";
-	private static final String KEY_STORE_PASSWORD = "webserver";
+	private static final String KEY_STORE_PASSWORD = "mypasswebserver";
 	private static final String KEY_STORE_ALIAS_WEBSERVER = "webserver";
 
-	private static KeyPair keyPair;
+	private static final String TRUST_STORE_FILE = "src/main/resources/webserver.truststore";
+	private static final String TRUST_STORE_PASSWORD = "mypasswebserver";
+	private static final String TRUST_STORE_ALIAS_CA = "ca";
+
+	// Data compartments
 
 	private static SecretKey personalInfoKey;
 
 	private static SecretKey energyPanelKey;
-
-	// TLS
-	private static InputStream cert;
-	private static InputStream key;
-
-	private static final String CERTIFICATE_PATH = "../tlscerts/webserver.crt";
-	private static final String KEY_PATH = "../tlscerts/webserver.pem";
 
 	// Database
 
@@ -77,6 +75,8 @@ public class WebserverMain {
 	// Usage: <serverPort> <databaseHost> <databasePort>
 	public static void main(String[] args) {
 
+		System.out.println(">>> " + WebserverMain.class.getSimpleName() + " <<<");
+
 		// Parse arguments
 		try {
 			if (args.length == 3) {
@@ -96,34 +96,27 @@ public class WebserverMain {
 			System.exit(1);
 		}
 
-		// Load server certificate for TLS
-
 		try {
-			cert = Files.newInputStream(Paths.get(CERTIFICATE_PATH));
-			key = Files.newInputStream(Paths.get(KEY_PATH));
-		} catch(IllegalArgumentException | UnsupportedOperationException | IOException e){
-			System.out.println("ERROR: Could not load server key or certificate: " + e.getMessage());
+			loadKeysCertificates();
+		} catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException | UnrecoverableKeyException e) {
+			System.out.println("ERROR: Could not load server keys and certificates: " + e.getMessage());
 			System.out.println("Exiting...");
 			System.exit(1);
 		}
 
-		// Start server
-
 		try {
-			SslContext sslContext = GrpcSslContexts.forServer(cert, key).build();
-			System.out.println(">>> " + WebserverMain.class.getSimpleName() + " <<<");
-
-			loadKeyPairs();
-
 			// Database
 			System.out.println("Setting up database connection on " + dbUrl);
 			Class.forName(DATABASE_DRIVER);
 			dbConnection = DriverManager.getConnection(dbUrl, DATABASE_USER, DATABASE_PASSWORD);
 			setupDatabase();
 
+			// Setup ssl context
+			SslContext sslContext = GrpcSslContexts.configure(SslContextBuilder.forServer(keyPair.getPrivate(), certificate).trustManager(CACertificate)).build();
+
 			// Service
-			webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey);
-			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext)
+			Webserver webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey);
+			Server server = forPort(serverPort).sslContext(sslContext)
 					.addService(new WebserverServiceImpl(webserver))
 					.addService(new WebserverBackofficeServiceImpl(webserver))
 					.build();
@@ -141,29 +134,31 @@ public class WebserverMain {
 			System.out.println("ERROR: Server aborted: " + e.getMessage());
 		} catch (IOException e) {
 			System.out.println("ERROR: Could not start server: " + e.getMessage());
-		} catch (SQLException e) {
+		} catch (SQLException | ClassNotFoundException e) {
 			System.out.println("ERROR: Could not connect to database: " + e.getMessage());
-		} catch (ClassNotFoundException | UnrecoverableKeyException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {
-			System.out.println("ERROR: Could not load compartment keys from JavaKeyStore: " + e.getMessage());
 		} finally {
 			System.out.println("Exiting...");
 		}
 	}
 
-	private static void loadKeyPairs() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
+	private static void loadKeysCertificates() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
 			IOException, UnrecoverableKeyException {
-		PrivateKey privateKey;
-		PublicKey publicKey;
 
+		// Key Store
 		KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
 		keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
 
-		// Webserver key pair
-		privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_WEBSERVER, KEY_STORE_PASSWORD.toCharArray());
-		publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_WEBSERVER).getPublicKey();
+		PrivateKey privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_WEBSERVER, KEY_STORE_PASSWORD.toCharArray());
+		PublicKey publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_WEBSERVER).getPublicKey();
 		keyPair = new KeyPair(publicKey, privateKey);
+		certificate = (X509Certificate) keyStore.getCertificate(KEY_STORE_ALIAS_WEBSERVER);
 
-		System.out.println("Successfully loaded key pairs from JavaKeyStore!");
+		// Trust Store
+		KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		trustStore.load(Files.newInputStream(Paths.get(TRUST_STORE_FILE)), TRUST_STORE_PASSWORD.toCharArray());
+		CACertificate = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_CA);
+
+		System.out.println("Successfully loaded key pairs and certificate from Java Keystore!");
 	}
 
 	private static void generateCompartmentKeys() throws NoSuchAlgorithmException, SQLException, IllegalBlockSizeException,
@@ -211,6 +206,11 @@ public class WebserverMain {
 		Statement statement;
 
 		try {
+			boolean reachable = dbConnection.isValid(25);
+			if (!reachable) {
+				throw new SQLException("Unreachable database connection.");
+			}
+
 			statement = dbConnection.createStatement();
 			statement.execute(DROP_INVOICE_TABLE);
 			statement.execute(DROP_SOLAR_PANEL_TABLE);
@@ -281,19 +281,15 @@ public class WebserverMain {
 		}
 		@Override
 		public void run() {
-			if (!gotCompartmentKeys) {
-				return;
-			}
-
 			System.out.println("\nGenerating new invoices for " + months.get(currMonth) + " " + currYear);
 			PreparedStatement st;
 			ResultSet rs;
 			try {
 				st = dbConnection.prepareStatement(READ_ALL_CLIENTS_ID_ENERGY_CONSUMPTION_PLAN);
-				st.setString(1, personalInfoKey.toString());
-				st.setString(2, personalInfoKey.toString());
-				st.setString(3, personalInfoKey.toString());
-				st.setString(4, energyPanelKey.toString());
+				st.setString(1, energyPanelKey.toString());
+				st.setString(2, energyPanelKey.toString());
+				st.setString(3, energyPanelKey.toString());
+				st.setString(4, personalInfoKey.toString());
 				rs = st.executeQuery();
 
 				while (rs.next()) {
