@@ -50,8 +50,8 @@ public class DatabaseQueries {
             "UNIQUE (client_id, name, brand)," +
             "PRIMARY KEY (id), " +
             "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)" +
-            //""; // TODO: remove this and add encryption when deploying on linux
-            " ENGINE=InnoDB ENCRYPTION='Y'";
+            ""; // TODO: remove this and add encryption when deploying on linux
+            //" ENGINE=InnoDB ENCRYPTION='Y'";
 
     public static final String CREATE_SOLAR_PANEL_TABLE =
         "CREATE TABLE solarpanel (" +
