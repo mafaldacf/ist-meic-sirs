@@ -52,7 +52,7 @@ public class AdminMain {
 		username = scanner.nextLine();
 
 		//System.out.print("Enter your strong password (10 to 30 characters and at least: 1 uppercase, 1 lowercase, 1 digit and 1 special character): ");
-		System.out.print("Enter your password:");
+		System.out.print("Enter your password: ");
 		password = scanner.nextLine();
 
 		/*

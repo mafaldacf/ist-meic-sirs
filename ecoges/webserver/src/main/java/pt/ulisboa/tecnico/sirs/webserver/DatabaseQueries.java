@@ -14,8 +14,9 @@ public class DatabaseQueries {
                     "id INTEGER NOT NULL AUTO_INCREMENT, " +
                     "personal_info_key BLOB NOT NULL, " +
                     "energy_panel_key BLOB NOT NULL, " +
-                    "PRIMARY KEY (id))";
-    //"ENGINE=InnoDB ENCRYPTION='Y'";
+                    "PRIMARY KEY (id))" +
+                    ""; // TODO: remove this and add encryption when deploying on linux
+                    //" ENGINE=InnoDB ENCRYPTION='Y'";
 
     public static final String CREATE_CLIENT_TABLE =
         "CREATE TABLE client (" +
@@ -33,8 +34,9 @@ public class DatabaseQueries {
             "token VARCHAR(64) DEFAULT ''," +
             "salt BLOB," +
             "UNIQUE (email)," +
-            "PRIMARY KEY (id)) ";
-            //"ENGINE=InnoDB ENCRYPTION='Y'";
+            "PRIMARY KEY (id))" +
+            ""; // TODO: remove this and add encryption when deploying on linux
+            //" ENGINE=InnoDB ENCRYPTION='Y'";
 
     public static final String CREATE_APPLIANCE_TABLE =
         "CREATE TABLE appliance (" +
@@ -47,8 +49,9 @@ public class DatabaseQueries {
             "energyConsumedNight BLOB, " +
             "UNIQUE (client_id, name, brand)," +
             "PRIMARY KEY (id), " +
-            "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)";
-            //"ENGINE=InnoDB ENCRYPTION='Y'";
+            "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)" +
+            //""; // TODO: remove this and add encryption when deploying on linux
+            " ENGINE=InnoDB ENCRYPTION='Y'";
 
     public static final String CREATE_SOLAR_PANEL_TABLE =
         "CREATE TABLE solarpanel (" +
@@ -59,8 +62,9 @@ public class DatabaseQueries {
             "energyProduced BLOB, " +
             "UNIQUE (client_id, name, brand)," +
             "PRIMARY KEY (id), " +
-            "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)";
-            //"ENGINE=InnoDB ENCRYPTION='Y'";
+            "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)" +
+            ""; // TODO: remove this and add encryption when deploying on linux
+            //" ENGINE=InnoDB ENCRYPTION='Y'";
 
     public static final String CREATE_INVOICE_TABLE =
         "CREATE TABLE invoice (" +
@@ -76,8 +80,9 @@ public class DatabaseQueries {
                 "taxes INTEGER NOT NULL, " +
                 "UNIQUE (client_id, year, month)," +
                 "PRIMARY KEY (id), " +
-                "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)";
-        //"ENGINE=InnoDB ENCRYPTION='Y'";
+                "FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)" +
+                ""; // TODO: remove this and add encryption when deploying on linux
+                //" ENGINE=InnoDB ENCRYPTION='Y'";
 
     public static final String CREATE_CLIENT =
             "INSERT INTO client(name, email, password, salt, address, iban, plan, energyConsumed, energyConsumedDaytime, energyConsumedNight, energyProduced) " +

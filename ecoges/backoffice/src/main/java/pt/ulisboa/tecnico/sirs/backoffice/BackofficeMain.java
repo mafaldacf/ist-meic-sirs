@@ -58,6 +58,8 @@ public class BackofficeMain {
 
 	// Usage: <serverPort> <webserverHost> <webserverPort> <databaseHost> <databasePort> <rbacHost> <rbacPort>
 	public static void main(String[] args) {
+		System.out.println(">>> " + BackofficeMain.class.getSimpleName() + " <<<");
+
 		try {
 			if (args.length == 7) {
 				// server
@@ -95,8 +97,6 @@ public class BackofficeMain {
 		// Start server
 
 		try {
-			System.out.println(">>> " + BackofficeMain.class.getSimpleName() + " <<<");
-
 			// Database
 			System.out.println("Setting up database connection on " + dbUrl);
 			Class.forName(DATABASE_DRIVER);
@@ -159,50 +159,21 @@ public class BackofficeMain {
 		Statement statement;
 
 		try {
-			statement = dbConnection.createStatement();
-			statement.execute(DROP_PERMISSION_TABLE);
-			statement.execute(DROP_ADMIN_TABLE);
+			boolean reachable = dbConnection.isValid(25);
+			if (!reachable) {
+				throw new SQLException("Unreachable database connection.");
+			}
 
+			statement = dbConnection.createStatement();
+			statement.execute(DROP_ADMIN_TABLE);
 
 			statement = dbConnection.createStatement();
 			statement.execute(CREATE_ADMIN_TABLE);
-			statement.execute(CREATE_PERMISSION_TABLE);
-
-			generatePermissions();
 
 			System.out.println("Database is ready!");
-		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e) {
+		} catch (SQLException e) {
 			System.out.println("Could not set up database: "+ e.getMessage());
 			System.exit(1);
 		}
-	}
-
-	public static void generatePermissions() throws SQLException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
-		PreparedStatement st;
-		ResultSet rs;
-
-		// Check if permissions already exist
-		st = dbConnection.prepareStatement(READ_PERMISSION_COUNT);
-		rs = st.executeQuery();
-
-		if (rs.next() && rs.getInt(1) != 0){
-			st.close();
-			return;
-		}
-		st.close();
-
-		// Account Management
-		st = dbConnection.prepareStatement(CREATE_ACCOUNT_MANAGER_PERMISSION);
-		st.setBoolean(1, true); // personal info
-		st.setBoolean(2, false); // energy panel
-		st.executeUpdate();
-		st.close();
-
-		// Energy Management
-		st = dbConnection.prepareStatement(CREATE_ENERGY_MANAGER_PERMISSION);
-		st.setBoolean(1, false); // personal info
-		st.setBoolean(2, true); // energy panel
-		st.executeUpdate();
-		st.close();
 	}
 }

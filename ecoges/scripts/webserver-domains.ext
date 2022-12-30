@@ -5,3 +5,4 @@ authorityKeyIdentifier=keyid,issuer
     [alt_names]
     DNS.1 = localhost
     IP.1 = 10.0.2.4
+    IP.2 = 192.168.0.2

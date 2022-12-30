@@ -75,6 +75,8 @@ public class WebserverMain {
 	// Usage: <serverPort> <databaseHost> <databasePort>
 	public static void main(String[] args) {
 
+		System.out.println(">>> " + WebserverMain.class.getSimpleName() + " <<<");
+
 		// Parse arguments
 		try {
 			if (args.length == 3) {
@@ -103,8 +105,6 @@ public class WebserverMain {
 		}
 
 		try {
-			System.out.println(">>> " + WebserverMain.class.getSimpleName() + " <<<");
-
 			// Database
 			System.out.println("Setting up database connection on " + dbUrl);
 			Class.forName(DATABASE_DRIVER);
@@ -206,6 +206,11 @@ public class WebserverMain {
 		Statement statement;
 
 		try {
+			boolean reachable = dbConnection.isValid(25);
+			if (!reachable) {
+				throw new SQLException("Unreachable database connection.");
+			}
+
 			statement = dbConnection.createStatement();
 			statement.execute(DROP_INVOICE_TABLE);
 			statement.execute(DROP_SOLAR_PANEL_TABLE);

@@ -89,7 +89,7 @@ Webserver machine:
 
     sudo ./webserver.sh
 
-Backoffice machine:
+Internal machine (backoffice and RBAC) machine:
 
     sudo ./backoffice.sh
 
@@ -107,9 +107,10 @@ Before deploying all machines, you need to generate the certificates that will b
 
 For the TLS, both webserver, backoffice and database ceritificates need to be issued to their IP address.
 
-Change the field `IP.1` in `ecoges/scripts/webserver-domains.ext` to the corresponding IP address (e.g. Firewall public IP `10.0.2.4`)
+Change the field `IP.1` in `ecoges/scripts/webserver-domains.ext` to the corresponding IP address (e.g. Firewall public IP `10.0.2.4`) and `IP.2` to its own address `192.168.0.2`
  
     IP.1 = 10.0.2.4
+    IP.2 = 192.168.0.2
 
 Change the field `IP.1` in `ecoges/scripts/backoffice-domains.ext` to the corresponding IP address (e.g. `192.168.2.2`)
 
@@ -130,11 +131,12 @@ To generate the certificates, simply run the script:
 
 # Set Up Database
 
+    cd ecoges/scripts
+
 Add `clientdb` schema:
 
     sudo mysql
-        DROP DATABASE IF EXISTS clientdb;
-        CREATE DATABASE clientdb;
+        source createdb.sql
 
 Add symmetric encryption mechanism:
 
@@ -211,27 +213,41 @@ For each machine, compile and run the project:
     cd ecoges
     mvn clean compile install -DskipTests
 
-Run **webserver** on port `<serverPort>` (e.g. `8000`) and communicate with database on `<databaseHost>` (e.g. `localhost` for development or `192.168.1.2`) with port `<databasePort>` (e.g. `3306`):
+## Alternative 1
+
+To simplify the task, we created a script that runs each unit automatically. Just make sure to modify, if necessary, each unit arguments (hosts and ports) in `run.sh`.
+
+The possible `<unit>` values are the following: **webserver**, **backoffice**, **rbac**, **client** or **admin**.
+
+    cd ecoges
+    sudo chmod 777 run.sh
+    ./run.sh <unit>
+
+## Alternative 2
+
+To run each machine, you can simply provide the maven commands manually and provide any desired arguments.
+
+Run **webserver**:
 
     cd ecoges/webserver
-    mvn exec:java -Dexec.args="8000 192.168.1.2 3306"
+    mvn exec:java -Dexec.args="<serverPort> <databaseHost> <databasePort>"
 
-Run **client** to communicate with webserver on `<serverHost>` (e.g. `localhost` for development; firewall public IP `10.0.2.4`) and port `<serverPort>` (e.g. `8000`):
+Run **backoffice**:
+
+    cd ecoges/backoffice
+    mvn exec:java -Dexec.args="<serverPort> <databaseHost> <databasePort> <rbacHost> <rbacPort>"
+
+Run **rbac**:
+
+    cd ecoges/rbac
+    mvn exec:java -Dexec.args="<serverPort>"
+
+Run **client**:
 
     cd ecoges/client
-    mvn exec:java -Dexec.args="10.0.2.4 8000"
+    mvn exec:java -Dexec.args="<publicWebserverHost> <serverPort>"
 
-Run **rbac** on port `<serverPort>` (e.g. `8002`):
-
-    cd ecoges/backoffice
-    mvn exec:java -Dexec.args="8002"
-
-Run **backoffice** on port `<serverPort>` (e.g. `8001`) and communicate with database on `<databaseHost>` (e.g. `localhost` for development or `192.168.1.2`) with port `<databasePort>` (e.g. `3306`). Additionally, communicate with rbac on localhost:8002
-
-    cd ecoges/backoffice
-    mvn exec:java -Dexec.args="8000 192.168.1.2 3306 localhost 8002"
-
-Run **admin** to communicate with backoffice on `<serverHost>` (e.g. `localhost` for development; `192.168.2.2`) and port `<serverPort>` (e.g. `8001`):
+Run **admin**:
 
     cd ecoges/admin
-    mvn exec:java -Dexec.args="192.168.2.2 8001"
+    mvn exec:java -Dexec.args="<serverHost> <serverPort>"
