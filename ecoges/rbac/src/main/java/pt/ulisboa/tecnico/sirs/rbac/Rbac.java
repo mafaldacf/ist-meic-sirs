@@ -22,30 +22,45 @@ import java.sql.*;
 import java.util.*;
 
 public class Rbac {
+    
+    private final RbacServiceGrpc.RbacServiceBlockingStub rbacserver;
 
     Map<Role, PermissionType> PermissionsByRoles = Map.ofEntries(
         Map.entry(Role.ENERGY_MANAGER, PermissionType.ENERGY_DATA),
         Map.entry(Role.ACCOUNT_MANAGER, PermissionType.PERSONAL_DATA)
     );
 
-    public Rbac() { }
+    // Data compartments
+	private static final String KEY_STORE_FILE = "src/main/resources/rbac-server.keystore";
+	private static final String KEY_STORE_PASSWORD = "rbac-server";
+	private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
+	private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
+
+    public Rbac(String rbacHost, int rbacPort) throws IOException
+    {
+        String targetRbac = rbacHost + ":" + rbacPort;
+		InputStream certRbac = Files.newInputStream(Paths.get("../tlscerts/rbac-server.crt"));
+
+        ManagedChannel channelRbac = NettyChannelBuilder.forTarget(targetRbac).sslContext(GrpcSslContexts.forClient().trustManager(certRbac).build()).build();
+		rbacserver = RbacServiceGrpc.newBlockingStub(channelRbac);
+    }
 
     //TODO: ADPTAR ESTA FUNC 
-    /*public Key requestCompartmentKey(Compartment compartment, String role) throws NoSuchPaddingException,
-    NoSuchAlgorithmException, InvalidKeyException, InvalidRoleException, KeyStoreException, IOException,
-    CertificateException, UnrecoverableKeyException, SignatureException, StatusRuntimeException {
-
+    public Key requestCompartmentKey(Compartment compartment, String role) throws NoSuchPaddingException,
+        NoSuchAlgorithmException, InvalidKeyException, InvalidRoleException, KeyStoreException, IOException,
+        CertificateException, UnrecoverableKeyException, SignatureException, StatusRuntimeException 
+    {
         PrivateKey privateKey;
         X509Certificate certificate;
 
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
 
-        if (role.equals(RoleType.ACCOUNT_MANAGER.toString())) {
+        if (role.equals(Role.ACCOUNT_MANAGER.toString())) {
             privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
             certificate = (X509Certificate) keyStore.getCertificate(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT);
         }
-        else if (role.equals(RoleType.ENERGY_MANAGER.toString())) {
+        else if (role.equals(Role.ENERGY_MANAGER.toString())) {
             privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ENERGY_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
             certificate = (X509Certificate) keyStore.getCertificate(KEY_STORE_ALIAS_ENERGY_MANAGEMENT);
         }
@@ -65,10 +80,10 @@ public class Rbac {
                 .setSignature(signature)
                 .build();
 
-        GetCompartmentKeyResponse response = webserver.getCompartmentKey(request);
+        GetCompartmentKeyResponse response = rbacserver.getCompartmentKey(request);
 
         return Security.unwrapKey(privateKey, response.getKey().toByteArray());
-    }*/
+    }
 
 
     /*

@@ -55,7 +55,7 @@ public class Backoffice {
 		InputStream certRbac = Files.newInputStream(Paths.get("../tlscerts/rbac-server.crt"));
 
 		ManagedChannel channelRbac = NettyChannelBuilder.forTarget(targetRbac).sslContext(GrpcSslContexts.forClient().trustManager(certRbac).build()).build();
-		rbacserver = RbacServiceGrpc.newBlockingStub(channel);
+		rbacserver = RbacServiceGrpc.newBlockingStub(channelRbac);
     }
 
     /*
@@ -261,6 +261,17 @@ public class Backoffice {
         return clients;
     }
 
+    public void validatePermission(String role, PermissionType permission) 
+    {
+        ValidatePermissionRequest request = ValidatePermissionRequest.newBuilder()
+            .setRole(Role.valueOf(role))
+            .setPermission(permission)
+            .build();
+
+        ValidatePermissionResponse response = rbacserver.validatePermissions(request);
+
+    }
+
     public PersonalInfo checkPersonalInfo(String username, String email, String hashedToken)
         throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException,
         InvalidRoleException, PermissionDeniedException, CompartmentKeyException, IllegalBlockSizeException,
@@ -273,6 +284,7 @@ public class Backoffice {
         String role;
 
         validateSession(username, hashedToken);
+
         // TODO: chamar função do Rbac here
         st = dbConnection.prepareStatement(READ_ADMIN_ROLE);
         st.setString(1, username);
@@ -285,13 +297,7 @@ public class Backoffice {
             throw new AdminDoesNotExistException(username);
         }
 
-        //TODO: FZR FUNÇÃO PARA TORNAR ISTO DINAMICO 
-        ValidatePermissionRequest request = ValidatePermissionRequest.newBuilder()
-            .setRole(Role.valueOf(role))
-            .setPermission(PermissionType.PERSONAL_DATA)
-            .build();
-
-        ValidatePermissionResponse response = rbacserver.validatePermissions(request);
+        validatePermission(role, PermissionType.PERSONAL_DATA);
 
         st.close();
 
@@ -356,13 +362,7 @@ public class Backoffice {
             throw new AdminDoesNotExistException(username);
         }
 
-        //TODO: FZR FUNÇÃO PARA TORNAR ISTO DINAMICO 
-        ValidatePermissionRequest request = ValidatePermissionRequest.newBuilder()
-            .setRole(Role.valueOf(role))
-            .setPermission(PermissionType.ENERGY_DATA)
-            .build();
-
-        ValidatePermissionResponse response = rbacserver.validatePermissions(request);
+        validatePermission(role, PermissionType.ENERGY_DATA);
 
         st.close();
 

@@ -26,6 +26,11 @@ public class RbacMain {
 	private static final String CERTIFICATE_PATH = "../tlscerts/rbac-server.crt";
 	private static final String KEY_PATH = "../tlscerts/rbac-server.pem";
 
+	// Rbac
+
+	private static String rbacHost = "localhost";
+	private static int rbacPort = 8002;
+
 	// Usage: <serverPort>
 	public static void main(String[] args) {
 		try {
@@ -59,7 +64,7 @@ public class RbacMain {
 			System.out.println(">>> " + RbacMain.class.getSimpleName() + " <<<");
 
 			// Services
-			Rbac rbacServer = new Rbac();
+			Rbac rbacServer = new Rbac(rbacHost, rbacPort);
 			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext)
 					.addService(new RbacServiceImpl(rbacServer)).build();
 			server.start();
