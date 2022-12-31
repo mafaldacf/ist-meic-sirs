@@ -74,6 +74,24 @@ mv rbac.keystore rbac.truststore ../rbac/src/main/resources/
 mv client.truststore ../client/src/main/resources/
 mv admin.truststore ../admin/src/main/resources/
 
+# ------------------------------------------------------------------------------------------
+# -------------------- SELF-SIGNED CERTIFICATES FOR TESTING PURPOSES -----------------------
+# ------------------------------------------------------------------------------------------
+
+createSelfSignedCertificates() { # Arguments: $1 -> name; $2 -> unit
+    openssl genrsa -out $2.key
+    openssl req -new -key $2.key -out $2.csr -subj "/CN=$1/OU=$2/O=IST/L=Lisbon/ST=Portugal/C=PT"
+    openssl x509 -req -days 365 -in $2.csr -signkey $2.key -set_serial 01 -out $2.crt
+    rm $2.csr
+
+    openssl pkcs12 -password pass:mypass$1 -export -in $2.crt -inkey $2.key -out $2.p12 -name $2 -CAfile ca.crt -caname root
+    keytool -importkeystore -deststorepass mypass$1 -destkeypass mypass$1 -destkeystore $1.keystore -srckeystore $2.p12 -srcstoretype PKCS12 -srcstorepass mypass$1 -alias $2
+    rm $2.p12 $2.key
+}
+
+createSelfSignedCertificates webserver-tests tests
+mv webserver-tests.keystore ../webserver/src/test/resources/
+
 echo ""
 echo "done!"
 

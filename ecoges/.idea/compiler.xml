@@ -31,7 +31,7 @@
       <module name="employee" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="rbac" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="server" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
-      <module name="webserver" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
+      <module name="webserver" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED --add-exports java.base/sun.security.tools.keytool=ALL-UNNAMED" />
     </option>
   </component>
 </project>
