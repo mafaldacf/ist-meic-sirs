@@ -33,6 +33,12 @@ public class DatabaseQueries {
             "energyProduced BLOB, " +
             "token VARCHAR(64) DEFAULT ''," +
             "salt BLOB," +
+            "obf_address VARCHAR(150) NOT NULL, " +
+            "obf_iban VARCHAR(150) NOT NULL, " +
+            "obf_energyConsumed VARCHAR(150) NOT NULL, " +
+            "obf_energyConsumedDaytime VARCHAR(150) NOT NULL, " +
+            "obf_energyConsumedNight VARCHAR(150) NOT NULL, " +
+            "obf_energyProduced VARCHAR(150) NOT NULL, " +
             "UNIQUE (email)," +
             "PRIMARY KEY (id))" +
             ""; // TODO: remove this and add encryption when deploying on linux
@@ -85,8 +91,8 @@ public class DatabaseQueries {
                 //" ENGINE=InnoDB ENCRYPTION='Y'";
 
     public static final String CREATE_CLIENT =
-            "INSERT INTO client(name, email, password, salt, address, iban, plan, energyConsumed, energyConsumedDaytime, energyConsumedNight, energyProduced) " +
-                    "VALUES(?, ?, ?, ?, AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?))";
+            "INSERT INTO client(name, email, password, salt, address, iban, plan, energyConsumed, energyConsumedDaytime, energyConsumedNight, energyProduced, obf_address, obf_iban, obf_energyConsumed, obf_energyConsumedDaytime, obf_energyConsumedNight, obf_energyProduced) " +
+                    "VALUES(?, ?, ?, ?, AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), AES_ENCRYPT(?, ?), ?, ?, ?, ?, ?, ?)";
 
     public static final String CREATE_COMPARTMENT_KEYS = "INSERT INTO compartment_keys(personal_info_key, energy_panel_key) VALUES(?, ?)";
 
@@ -102,15 +108,18 @@ public class DatabaseQueries {
 
     public static final String READ_COMPARTMENT_KEYS = "SELECT personal_info_key, energy_panel_key FROM compartment_keys";
 
-    public static final String READ_CLIENT_PERSONAL_INFO = "SELECT name, email, AES_DECRYPT(address, ?), AES_DECRYPT(iban, ?), AES_DECRYPT(plan, ?) FROM client WHERE email = ?";
+    public static final String READ_CLIENT_PERSONAL_INFO = "SELECT name, email, obf_address, obf_iban, AES_DECRYPT(plan, ?) FROM client WHERE email = ?";
 
     public static final String READ_CLIENT_ENERGY_PANEL = "SELECT AES_DECRYPT(energyConsumed, ?),  AES_DECRYPT(energyConsumedDaytime, ?),  AES_DECRYPT(energyConsumedNight, ?),  AES_DECRYPT(energyProduced, ?) FROM client WHERE email= ? ";
     public static final String READ_INVOICES = "SELECT year, month, paymentAmount, energyConsumed, energyConsumedDaytime, energyConsumedNight, plan, taxes FROM invoice WHERE client_id = ? " +
             "ORDER BY year, month";
 
-    public static final String READ_CLIENT_ENERGY_CONSUMPTION = "SELECT AES_DECRYPT(energyConsumed, ?),  AES_DECRYPT(energyConsumedDaytime, ?),  AES_DECRYPT(energyConsumedNight, ?) FROM client WHERE email= ? ";
-    public static final String READ_CLIENT_ENERGY_PRODUCTION = "SELECT AES_DECRYPT(energyProduced, ?) FROM client WHERE email= ? ";
+    //public static final String READ_CLIENT_ENERGY_CONSUMPTION = "SELECT AES_DECRYPT(energyConsumed, ?),  AES_DECRYPT(energyConsumedDaytime, ?),  AES_DECRYPT(energyConsumedNight, ?) FROM client WHERE email= ? ";
+    public static final String READ_CLIENT_ENERGY_CONSUMPTION = "SELECT obf_energyConsumed, obf_energyConsumedDaytime, obf_energyConsumedNight FROM client WHERE email= ?";
 
+    //public static final String READ_CLIENT_ENERGY_PRODUCTION = "SELECT AES_DECRYPT(energyProduced, ?) FROM client WHERE email= ? ";
+    public static final String READ_CLIENT_ENERGY_PRODUCTION = "SELECT obf_energyProduced FROM client WHERE email= ?";
+    
     public static final String READ_CLIENT_TOKEN = "SELECT token FROM client WHERE email = ?";
 
     public static final String READ_ALL_CLIENTS_ID_ENERGY_CONSUMPTION_PLAN = "SELECT id, AES_DECRYPT(energyConsumed, ?), AES_DECRYPT(energyConsumedDaytime, ?), AES_DECRYPT(energyConsumedNight, ?), AES_DECRYPT(plan, ?) FROM client";
@@ -122,12 +131,12 @@ public class DatabaseQueries {
     public static final String READ_APPLIANCES = "SELECT name, brand, AES_DECRYPT(energyConsumed, ?), AES_DECRYPT(energyConsumedDaytime, ?), AES_DECRYPT(energyConsumedNight, ?) FROM appliance WHERE client_id = ? ";
     public static final String READ_SOLAR_PANELS = "SELECT name, brand, AES_DECRYPT(energyProduced, ?) FROM solarpanel WHERE client_id = ? ";
 
-    public static final String UPDATE_CLIENT_ENERGY_CONSUMPTION = "UPDATE client SET energyConsumed = AES_ENCRYPT(?, ?), energyConsumedDaytime = AES_ENCRYPT(?, ?), energyConsumedNight = AES_ENCRYPT(?, ?) WHERE email = ?";
-    public static final String UPDATE_CLIENT_ENERGY_PRODUCTION = "UPDATE client SET energyProduced = AES_ENCRYPT(?, ?) WHERE email = ?";
+    public static final String UPDATE_CLIENT_ENERGY_CONSUMPTION = "UPDATE client SET energyConsumed = AES_ENCRYPT(?, ?), energyConsumedDaytime = AES_ENCRYPT(?, ?), energyConsumedNight = AES_ENCRYPT(?, ?), obf_energyConsumed = ?, obf_energyConsumedDaytime = ?, obf_energyConsumedNight = ? WHERE email = ?";
+    public static final String UPDATE_CLIENT_ENERGY_PRODUCTION = "UPDATE client SET energyProduced = AES_ENCRYPT(?, ?), obf_energyProduced = ? WHERE email = ?";
 
     public static final String UPDATE_CLIENT_TOKEN = "UPDATE client SET token = ? WHERE email = ?";
 
-    public static final String UPDATE_CLIENT_ADDRESS = "UPDATE client SET address = AES_ENCRYPT(?, ?) WHERE email = ?";
+    public static final String UPDATE_CLIENT_ADDRESS = "UPDATE client SET address = AES_ENCRYPT(?, ?), obf_address = ? WHERE email = ?";
 
     public static final String UPDATE_CLIENT_PLAN = "UPDATE client SET plan = AES_ENCRYPT(?, ?) WHERE email = ?";
 }

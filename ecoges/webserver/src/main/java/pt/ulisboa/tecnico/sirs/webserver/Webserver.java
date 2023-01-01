@@ -94,6 +94,41 @@ public class Webserver {
             throw new CompartmentKeyException();
         }
     }
+
+    /*
+    ------------------------------------------------------
+    ---------------- CLIENT SESSION TOKEN ----------------
+    ------------------------------------------------------
+     */
+
+    private String obfuscate(String text){
+        int len = text.length();
+        if (text == null || len <= 1) {
+            return text;
+        }
+        char[] chars = text.toCharArray();
+        
+        if (len == 2){
+            chars[1] = '*';
+            return new String(chars);
+        } else if (len == 3){
+            chars[1] = '*';
+            chars[2] = '*';
+            return new String(chars);
+        } else if (len == 4){
+            chars[1] = '*';
+            chars[2] = '*';
+            chars[3] = '*';
+            return new String(chars);
+        }
+
+        for (int i = 3; i < chars.length; i++) {
+            chars[i] = '*';
+        }
+        return new String(chars);
+    }
+
+
 /*
     ------------------------------------------------------
     ---------------- CLIENT SESSION TOKEN ----------------
@@ -193,6 +228,18 @@ public class Webserver {
         st.setString(16, energyPanelKey.toString());
         st.setFloat(17, 0);
         st.setString(18, energyPanelKey.toString());
+
+        // obfuscated info
+        st.setString(19, obfuscate(address));
+        st.setString(20, obfuscate(iban));
+
+
+        float noval = 0;
+        st.setString(21, obfuscate(Float.toString(noval)));
+        st.setString(22, obfuscate(Float.toString(noval)));
+        st.setString(23, obfuscate(Float.toString(noval)));
+        st.setString(24, obfuscate(Float.toString(noval)));
+
         st.executeUpdate();
         st.close();
     }
@@ -349,25 +396,25 @@ public class Webserver {
         st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
 
         //encrypted compartment: personal info
+        //st.setString(1, personalInfoKey.toString());
+        //st.setString(2, personalInfoKey.toString());
         st.setString(1, personalInfoKey.toString());
-        st.setString(2, personalInfoKey.toString());
-        st.setString(3, personalInfoKey.toString());
 
-        st.setString(4, clientEmail);
+        st.setString(2, clientEmail);
         rs = st.executeQuery();
 
         if (rs.next()) {
             String name = rs.getString(1);
             String email = rs.getString(2);
-            String address = rs.getString(3);
-            String iban = rs.getString(4);
+            String obf_address = rs.getString(3);
+            String obf_iban = rs.getString(4);
             String plan = rs.getString(5);
 
             personalInfo = PersonalInfo.newBuilder()
                     .setName(name)
                     .setEmail(email)
-                    .setAddress(address)
-                    .setIBAN(iban)
+                    .setAddress(obf_address)
+                    .setIBAN(obf_iban)
                     .setPlan(PlanType.valueOf(plan))
                     .build();
         }
@@ -470,7 +517,7 @@ public class Webserver {
         }
 
         st.close();
-
+        UPDATE_CLIENT
         return invoices;
     }
 
@@ -486,7 +533,8 @@ public class Webserver {
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ADDRESS);
         st.setString(1, address);
         st.setString(2, personalInfoKey.toString());
-        st.setString(3, email);
+        st.setString(3, obfuscate(address));
+        st.setString(4, email);
         st.executeUpdate();
         st.close();
     }
@@ -569,7 +617,10 @@ public class Webserver {
         st.setString(4, energyPanelKey.toString());
         st.setFloat(5, currEnergyConsumedNight + energyConsumedNight);
         st.setString(6, energyPanelKey.toString());
-        st.setString(7, email);
+        st.setString(7, obfuscate(Float.toString(currEnergyConsumed + energyConsumed)));
+        st.setString(8, obfuscate(Float.toString(currEnergyConsumedDaytime + energyConsumedDaytime)));
+        st.setString(9, obfuscate(Float.toString(currEnergyConsumedNight + energyConsumedNight)));
+        st.setString(10, email);
         st.executeUpdate();
         st.close();
     }
@@ -598,7 +649,8 @@ public class Webserver {
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ENERGY_PRODUCTION);
         st.setFloat(1, currEnergyProduced + energyProduced);
         st.setString(2, energyPanelKey.toString());
-        st.setString(3, email);
+        st.setString(3, obfuscate(Float.toString(currEnergyProduced + energyProduced)));
+        st.setString(4, email);
         st.executeUpdate();
         st.close();
     }
