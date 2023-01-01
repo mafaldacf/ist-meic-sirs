@@ -34,11 +34,6 @@ public class RbacMain {
 	private static final String TRUST_STORE_PASSWORD = "mypassrbac";
 	private static final String TRUST_STORE_ALIAS_CA = "ca";
 
-	// Rbac
-
-	private static String rbacHost = "localhost";
-	private static int rbacPort = 8002;
-
 	// Usage: <serverPort>
 	public static void main(String[] args) {
 		try {
@@ -73,7 +68,7 @@ public class RbacMain {
 					.trustManager(CACertificate)).build();
 
 			// Services
-			Rbac rbacServer = new Rbac(rbacHost, rbacPort);
+			Rbac rbacServer = new Rbac();
 			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext)
 					.addService(new RbacServiceImpl(rbacServer)).build();
 			server.start();

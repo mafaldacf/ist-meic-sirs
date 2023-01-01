@@ -9,7 +9,6 @@ import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.rbac.exceptions.*;
 import pt.ulisboa.tecnico.sirs.rbac.grpc.*;
 
-import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,12 +17,11 @@ import java.nio.file.Paths;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.sql.*;
 import java.util.*;
 
 public class Rbac {
     
-    private final RbacServiceGrpc.RbacServiceBlockingStub rbacserver;
+    private RbacServiceGrpc.RbacServiceBlockingStub rbacserver;
 
     Map<Role, PermissionType> PermissionsByRoles = Map.ofEntries(
         Map.entry(Role.ENERGY_MANAGER, PermissionType.ENERGY_DATA),
@@ -36,13 +34,9 @@ public class Rbac {
 	private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
 	private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
 
-    public Rbac(String rbacHost, int rbacPort) throws IOException
+    public Rbac()
     {
-        String targetRbac = rbacHost + ":" + rbacPort;
-		InputStream certRbac = Files.newInputStream(Paths.get("../tlscerts/rbac-server.crt"));
 
-        ManagedChannel channelRbac = NettyChannelBuilder.forTarget(targetRbac).sslContext(GrpcSslContexts.forClient().trustManager(certRbac).build()).build();
-		rbacserver = RbacServiceGrpc.newBlockingStub(channelRbac);
     }
 
     //TODO: ADPTAR ESTA FUNC 

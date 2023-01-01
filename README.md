@@ -6,14 +6,15 @@ Network and Computer Security 2022/2023
 
 # EcoGes
 
-This project aims to develop a new system for the Electricity provider, which allows clients to have a minute-by-minute update on their energy consumption and production. With this new system, the user can monitor the energy cost of every household appliance or how much energy the solar panels produce by logging into the EcoGes website. The system is also used to manage every user's contract and calculate the monthly invoices regarding the consumed energy, the energy plan (flat rate or bi-hourly rate), and taxes.
+This project aims to develop a new system for the electricity provider, Ecoges, which allows clients to monitor the energy cost of household appliances and the energy production of solar panels. The system is also used to calculate the monthly invoices for consumed energy and taxes and manage the energy plan (flat or bi-hourly rate).
 
 The EcoGes application concerns a five-tier system:
-- A set of clients that can access EcoGes through a public website.
-- A public website for clients to access energy consumption information and update their personal data.
-- An internal private back office where employees of EcoGes can manage the system according to their role in the company (marketing, account manager, technical assistant, or system manager).
-- A set of internal machines where employees can access the back office.
-- A database server to store persistent information regarding clients and the organization’s internal data.
+- A **public website** for clients to access and update their information.
+- A **client** that can access EcoGes through a public website to access and update their personal information, add new appliances and solar panels, and access energy consumption, production, and invoices.
+- A **backoffice** in the **internal machine** where employees of can manage the system according to their role in the company: account manager or energy manager.
+- A Role-Based Access Control entity (**RBAC**) in the **internal machine** that receives requests from the backoffice regarding employees’ accesses according to their role.
+- An **admin machine** where employees can access the back office.
+- A **database** to store information regarding clients and internal data.
 
 # Technology Used
 - Java programming language
@@ -62,7 +63,7 @@ All machines will be running on Linux and configured according to the following 
 | 1 | 192.168.0.2 | enp0s3 | Internal Network | sw-0
 | __Database Machine__ |
 | 1 | 192.168.1.2 | enp0s3 | Internal Network | sw-1
-| __Backoffice Machine__ |
+| __Internal Machine (Backoffice & RBAC)__ |
 | 1 | 192.168.2.2 | enp0s3 | Internal Network | sw-2
 | __Admin Machine__ |
 | 1 | 192.168.2.2 | enp0s3 | Internal Network | sw-2
@@ -206,6 +207,13 @@ Generate the database tables using the SQL script:
     exit
 
 
+# Run JUnit Tests
+
+To run JUnit tests, make sure the database server is running on **localhost** and servers are able to open a connection with it:
+
+    cd ecoges
+    mvn test
+
 # Compile and Run
 
 For each machine, compile and run the project:
@@ -215,13 +223,13 @@ For each machine, compile and run the project:
 
 ## Alternative 1
 
-To simplify the task, we created a script that runs each unit automatically. Just make sure to modify, if necessary, each unit arguments (hosts and ports) in `run.sh`.
+To simplify the task, we created a script that runs each module automatically.
 
-The possible `<unit>` values are the following: **webserver**, **backoffice**, **rbac**, **client** or **admin**.
+Run each module for each machine by providing the following possible values to `<module>` field: **webserver**, **backoffice**, **rbac**, **client** or **admin**. If desired, modules can be run on localhost by setting the development environment `-dev` before specifying the module.
 
     cd ecoges
     sudo chmod 777 run.sh
-    ./run.sh <unit>
+    ./run.sh <module>
 
 ## Alternative 2
 

@@ -24,11 +24,8 @@ import java.util.List;
 import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
 
 public class Webserver {
-    private final Connection dbConnection;
+    private Connection dbConnection;
 
-    // Invoices
-    private final int MAX_ENERGY_CONSUMPTION = 100;
-    private final int MAX_ENERGY_PRODUCTION = 100;
     private static final List<String> months = new ArrayList<>(Arrays.asList
             ("Jan", "Feb", "Mar", "Apr", "Mai", "Jun", "Jul", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"));
 
@@ -40,6 +37,11 @@ public class Webserver {
     // Compartments
     private final SecretKey personalInfoKey;
     private final SecretKey energyPanelKey;
+
+    public Webserver(SecretKey personalInfoKey, SecretKey energyPanelKey) {
+        this.personalInfoKey = personalInfoKey;
+        this.energyPanelKey = energyPanelKey;
+    }
 
     public Webserver(Connection dbConnection, SecretKey personalInfoKey, SecretKey energyPanelKey) {
         this.dbConnection = dbConnection;
@@ -321,8 +323,10 @@ public class Webserver {
         st.close();
 
         // generate random energy consumed
-        float energyConsumedDaytime = (float)(Math.random()*MAX_ENERGY_CONSUMPTION);
-        float energyConsumedNight = (float)(Math.random()*MAX_ENERGY_CONSUMPTION);
+        // Invoices
+        int MAX_ENERGY_CONSUMPTION = 100;
+        float energyConsumedDaytime = (float)(Math.random()* MAX_ENERGY_CONSUMPTION);
+        float energyConsumedNight = (float)(Math.random()* MAX_ENERGY_CONSUMPTION);
         float energyConsumed = energyConsumedDaytime + energyConsumedNight;
 
         // add appliance
@@ -367,7 +371,8 @@ public class Webserver {
         }
 
         // generate random energy produced
-        float energyProduced = (float)(Math.random()*MAX_ENERGY_PRODUCTION);
+        int MAX_ENERGY_PRODUCTION = 100;
+        float energyProduced = (float)(Math.random()* MAX_ENERGY_PRODUCTION);
 
         // add solar panel
         st = dbConnection.prepareStatement(CREATE_SOLAR_PANEL);

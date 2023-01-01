@@ -51,11 +51,11 @@ public class AdminMain {
 		System.out.print("Enter your username: ");
 		username = scanner.nextLine();
 
-		//System.out.print("Enter your strong password (10 to 30 characters and at least: 1 uppercase, 1 lowercase, 1 digit and 1 special character): ");
-		System.out.print("Enter your password: ");
-		password = scanner.nextLine();
+		System.out.print("Enter your strong password (10 to 30 characters and at least: 1 uppercase, 1 lowercase, 1 digit and 1 special character): ");
+		//System.out.print("Enter your password: ");
+		//password = scanner.nextLine();
 
-		/*
+
 		while(true) {
 			try {
 				password = scanner.nextLine();
@@ -66,7 +66,6 @@ public class AdminMain {
 				System.out.print("Enter your strong password again: ");
 			}
 		}
-		*/
 
 		int role = getRole();
 		if (Admin.register(username, password, role)) {

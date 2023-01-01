@@ -33,8 +33,8 @@ import static pt.ulisboa.tecnico.sirs.backoffice.DatabaseQueries.*;
 
 public class Backoffice {
     private final Connection dbConnection;
-    private final WebserverBackofficeServiceGrpc.WebserverBackofficeServiceBlockingStub webserver;
-    private final RbacServiceGrpc.RbacServiceBlockingStub rbacserver;
+    private WebserverBackofficeServiceGrpc.WebserverBackofficeServiceBlockingStub webserver;
+    private RbacServiceGrpc.RbacServiceBlockingStub rbacserver;
 
     // TLS
     private static final String TRUST_STORE_FILE = "src/main/resources/backoffice.truststore";
@@ -48,6 +48,10 @@ public class Backoffice {
     private static final String KEY_STORE_PASSWORD = "mypassbackoffice";
     private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
     private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
+
+    public Backoffice(Connection dbConnection) {
+        this.dbConnection = dbConnection;
+    }
 
     public Backoffice(Connection dbConnection, String webserverHost, int webserverPort, String rbacHost, int rbacPort) throws IOException, KeyStoreException, CertificateException, NoSuchAlgorithmException {
         this.dbConnection = dbConnection;
