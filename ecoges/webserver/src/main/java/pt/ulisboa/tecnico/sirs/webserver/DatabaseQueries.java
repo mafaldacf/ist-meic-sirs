@@ -114,11 +114,11 @@ public class DatabaseQueries {
     public static final String READ_INVOICES = "SELECT year, month, paymentAmount, energyConsumed, energyConsumedDaytime, energyConsumedNight, plan, taxes FROM invoice WHERE client_id = ? " +
             "ORDER BY year, month";
 
-    //public static final String READ_CLIENT_ENERGY_CONSUMPTION = "SELECT AES_DECRYPT(energyConsumed, ?),  AES_DECRYPT(energyConsumedDaytime, ?),  AES_DECRYPT(energyConsumedNight, ?) FROM client WHERE email= ? ";
-    public static final String READ_CLIENT_ENERGY_CONSUMPTION = "SELECT obf_energyConsumed, obf_energyConsumedDaytime, obf_energyConsumedNight FROM client WHERE email= ?";
+    public static final String READ_CLIENT_ENERGY_CONSUMPTION = "SELECT AES_DECRYPT(energyConsumed, ?),  AES_DECRYPT(energyConsumedDaytime, ?),  AES_DECRYPT(energyConsumedNight, ?) FROM client WHERE email= ? ";
+    //public static final String READ_CLIENT_ENERGY_CONSUMPTION = "SELECT obf_energyConsumed, obf_energyConsumedDaytime, obf_energyConsumedNight FROM client WHERE email= ?";
 
-    //public static final String READ_CLIENT_ENERGY_PRODUCTION = "SELECT AES_DECRYPT(energyProduced, ?) FROM client WHERE email= ? ";
-    public static final String READ_CLIENT_ENERGY_PRODUCTION = "SELECT obf_energyProduced FROM client WHERE email= ?";
+    public static final String READ_CLIENT_ENERGY_PRODUCTION = "SELECT AES_DECRYPT(energyProduced, ?) FROM client WHERE email= ? ";
+    //public static final String READ_CLIENT_ENERGY_PRODUCTION = "SELECT obf_energyProduced FROM client WHERE email= ?";
     
     public static final String READ_CLIENT_TOKEN = "SELECT token FROM client WHERE email = ?";
 

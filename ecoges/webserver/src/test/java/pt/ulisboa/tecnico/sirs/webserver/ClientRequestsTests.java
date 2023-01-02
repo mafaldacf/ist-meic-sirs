@@ -5,6 +5,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
+import pt.ulisboa.tecnico.sirs.webserver.grpc.EnergyPanel;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.PersonalInfo;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.PlanType;
 
@@ -15,7 +16,6 @@ import java.nio.file.Paths;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.sql.*;
-import java.util.ArrayList;
 
 import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
 import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.CREATE_COMPARTMENT_KEYS_TABLE;
@@ -51,22 +51,66 @@ public class ClientRequestsTests {
         loadKeysCertificates();
         setupDatabase();
         webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey);
-        webserver.register("name", email, password, "address", "iban", PlanType.FLAT_RATE.name());
+        webserver.register("name", email, password, "new address", "iban", PlanType.FLAT_RATE.name());
+    }
+
+    @Test
+    public void updatePlanTest() throws SQLException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidSessionTokenException, NoSuchAlgorithmException, ClientDoesNotExistException, InvalidKeyException {
+        webserver.updatePlan(email, PlanType.BI_HOURLY_RATE.name(), token);
+    }
+
+    @Test
+    public void updateAddressTest() throws SQLException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidSessionTokenException, NoSuchAlgorithmException, ClientDoesNotExistException, InvalidKeyException {
+        webserver.updateAddress(email, "address", token);
     }
 
     @Test
     public void CheckPersonalInfoTest() throws SQLException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidSessionTokenException, NoSuchAlgorithmException, ClientDoesNotExistException, InvalidKeyException {
         PersonalInfo personalInfo = webserver.checkPersonalInfo(email, token);
         Assert.assertEquals("name", personalInfo.getName());
-        Assert.assertEquals("address", personalInfo.getAddress());
-        Assert.assertEquals("iban", personalInfo.getIBAN());
-        Assert.assertEquals(PlanType.FLAT_RATE, personalInfo.getPlan());
+        Assert.assertEquals("****ess", personalInfo.getAddress());
+        Assert.assertEquals("***n", personalInfo.getIBAN());
+        Assert.assertEquals(PlanType.BI_HOURLY_RATE, personalInfo.getPlan());
     }
 
     @Test
     public void CheckPersonalInfoInvalidTokenTest() {
         Assert.assertThrows(InvalidSessionTokenException.class, () ->
             webserver.checkPersonalInfo(email, "invalid token"));
+    }
+
+    @Test
+    public void addApplianceTest() throws SQLException, ApplianceAlreadyExistsException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidSessionTokenException, NoSuchAlgorithmException, ClientDoesNotExistException, InvalidKeyException {
+        webserver.addApplicance(email, "a1", "b1", token);
+    }
+
+    @Test
+    public void addApplianceDiffBrandTest() throws SQLException, ApplianceAlreadyExistsException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidSessionTokenException, NoSuchAlgorithmException, ClientDoesNotExistException, InvalidKeyException {
+        webserver.addApplicance(email, "a1", "b2", token);
+    }
+
+    @Test
+    public void addSolarPanelTest() throws SolarPanelAlreadyExistsException, SQLException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidSessionTokenException, NoSuchAlgorithmException, ClientDoesNotExistException, InvalidKeyException {
+        webserver.addSolarPanel(email, "s1", "b1", token);
+    }
+
+    @Test
+    public void addApplianceAlreadyExistsTest() {
+        Assert.assertThrows(ApplianceAlreadyExistsException.class, () ->
+                webserver.addApplicance(email, "a1", "b1", token));
+    }
+
+    @Test
+    public void addSolarPanelExistsTest() {
+        Assert.assertThrows(SolarPanelAlreadyExistsException.class, () ->
+                webserver.addSolarPanel(email, "s1", "b1", token));
+    }
+
+    @Test
+    public void checkEnergyPanelTest() throws SQLException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidSessionTokenException, NoSuchAlgorithmException, ClientDoesNotExistException, InvalidKeyException {
+        EnergyPanel energyPanel = webserver.checkEnergyPanel(email, token);
+        Assert.assertEquals(2, energyPanel.getAppliancesCount());
+        Assert.assertEquals(1, energyPanel.getSolarPanelsCount());
     }
 
     public static void setupDatabase() throws ClassNotFoundException, SQLException {
