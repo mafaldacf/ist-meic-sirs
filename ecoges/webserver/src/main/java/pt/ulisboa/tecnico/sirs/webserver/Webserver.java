@@ -106,25 +106,25 @@ public class Webserver {
     private String obfuscate(String text){
         int len = text.length();
         if (text == null || len <= 1) {
-            return text;
+            return "***";
         }
         char[] chars = text.toCharArray();
         
         if (len == 2){
-            chars[1] = '*';
+            chars[0] = '*';
             return new String(chars);
         } else if (len == 3){
+            chars[0] = '*';
             chars[1] = '*';
-            chars[2] = '*';
             return new String(chars);
         } else if (len == 4){
+            chars[0] = '*';
             chars[1] = '*';
             chars[2] = '*';
-            chars[3] = '*';
             return new String(chars);
         }
 
-        for (int i = 3; i < chars.length; i++) {
+        for (int i = 0; i < chars.length - 3; i++) {
             chars[i] = '*';
         }
         return new String(chars);
@@ -461,10 +461,10 @@ public class Webserver {
         rs = st.executeQuery();
 
         if (rs.next()) {
-            float energyConsumed = rs.getFloat(1);
-            float energyConsumedDaytime = rs.getFloat(2);
-            float energyConsumedNight = rs.getFloat(3);
-            float energyProduced = rs.getFloat(4);
+            String energyConsumed = obfuscate(Float.toString(rs.getFloat(1)));
+            String energyConsumedDaytime = obfuscate(Float.toString(rs.getFloat(2)));
+            String energyConsumedNight = obfuscate(Float.toString(rs.getFloat(3)));
+            String energyProduced = obfuscate(Float.toString(rs.getFloat(4)));
 
             energyPanel = EnergyPanel.newBuilder()
                     .setEnergyConsumed(energyConsumed)
@@ -501,10 +501,10 @@ public class Webserver {
         while (rs.next()) {
             int year = rs.getInt(1);
             int month = rs.getInt(2);
-            float paymentAmount = rs.getFloat(3);
-            float energyConsumed = rs.getFloat(4);
-            float energyConsumedDaytime = rs.getFloat(5);
-            float energyConsumedNight = rs.getFloat(6);
+            String paymentAmount = obfuscate(Float.toString(rs.getFloat(3)));
+            String energyConsumed = obfuscate(Float.toString(rs.getFloat(4)));
+            String energyConsumedDaytime = obfuscate(Float.toString(rs.getFloat(5)));
+            String energyConsumedNight = obfuscate(Float.toString(rs.getFloat(6)));
             String plan = rs.getString(7);
             int taxes = rs.getInt(8);
 
@@ -522,7 +522,6 @@ public class Webserver {
         }
 
         st.close();
-        UPDATE_CLIENT
         return invoices;
     }
 
@@ -676,9 +675,9 @@ public class Webserver {
         while (rs.next()) {
             String name = rs.getString(1);
             String brand = rs.getString(2);
-            float energyConsumed = rs.getFloat(3);
-            float energyConsumedDaytime = rs.getFloat(4);
-            float energyConsumedNight = rs.getFloat(5);
+            String energyConsumed = obfuscate(Float.toString(rs.getFloat(3)));
+            String energyConsumedDaytime = obfuscate(Float.toString(rs.getFloat(4)));
+            String energyConsumedNight = obfuscate(Float.toString(rs.getFloat(5)));
 
             Appliance appliance = Appliance.newBuilder()
                     .setName(name)
@@ -709,7 +708,7 @@ public class Webserver {
         while (rs.next()) {
             String name = rs.getString(1);
             String brand = rs.getString(2);
-            float energyProduced = rs.getFloat(3);
+            String energyProduced = obfuscate(Float.toString(rs.getFloat(3)));
 
             SolarPanel solarPanel = SolarPanel.newBuilder()
                     .setName(name)

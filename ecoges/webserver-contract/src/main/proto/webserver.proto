@@ -87,10 +87,10 @@ message CheckPersonalInfoResponse {
 // Check energy panel
 
 message EnergyPanel {
-	float energyConsumed = 1;
-	float energyConsumedDaytime = 2;
-	float energyConsumedNight = 3;
-	float energyProduced = 4;
+	string energyConsumed = 1;
+	string energyConsumedDaytime = 2;
+	string energyConsumedNight = 3;
+	string energyProduced = 4;
 	repeated Appliance appliances = 5;
 	repeated SolarPanel solarPanels = 6;
 }
@@ -98,15 +98,15 @@ message EnergyPanel {
 message SolarPanel {
 	string name = 1;
 	string brand = 2;
-	float energyProduced = 3;
+	string energyProduced = 3;
 }
 
 message Appliance {
 	string name = 1;
 	string brand = 2;
-	float energyConsumed = 3;
-	float energyConsumedDaytime = 4;
-	float energyConsumedNight = 5;
+	string energyConsumed = 3;
+	string energyConsumedDaytime = 4;
+	string energyConsumedNight = 5;
 }
 
 message CheckEnergyPanelRequest {
@@ -123,10 +123,10 @@ message CheckEnergyPanelResponse {
 message Invoice {
 	int32 year = 1;
 	string month = 2;
-	float paymentAmount = 3;
-	float energyConsumed = 4;
-	float energyConsumedDaytime = 5;
-	float energyConsumedNight = 6;
+	string paymentAmount = 3;
+	string energyConsumed = 4;
+	string energyConsumedDaytime = 5;
+	string energyConsumedNight = 6;
 	PlanType plan = 7;
 	int32 taxes = 8;
 }
