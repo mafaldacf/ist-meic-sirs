@@ -23,14 +23,16 @@ public class RbacServiceImpl extends RbacServiceGrpc.RbacServiceImplBase {
 
 	@Override
 	public void validatePermissions(ValidatePermissionRequest request, StreamObserver<ValidatePermissionResponse> responseObserver) {
-		ValidatePermissionResponse.Builder builder = ValidatePermissionResponse.newBuilder();
-		try {
-			server.validatePermissions(request.getRole(), request.getPermission());
-
-			builder.setAck(true);
+		try {		
+			ValidatePermissionResponse response = server.validatePermissions(request.getUsername(), request.getRole(), request.getPermission());
+			ValidatePermissionResponse.Builder builder = response.toBuilder();
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
+		} catch (NoSuchPaddingException | NoSuchAlgorithmException | UnrecoverableKeyException | 
+			CertificateException | KeyStoreException | SignatureException | InvalidKeyException | IOException e)
+		{
+   			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (PermissionDeniedException e){
 			responseObserver.onError(Status.PERMISSION_DENIED.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidRoleException e){

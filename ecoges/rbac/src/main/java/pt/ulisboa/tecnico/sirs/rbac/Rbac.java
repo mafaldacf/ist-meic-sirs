@@ -18,6 +18,8 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.*;
+import java.time.format.DateTimeFormatter;  
+import java.time.LocalDateTime; 
 
 public class Rbac {
     
@@ -29,56 +31,47 @@ public class Rbac {
     );
 
     // Data compartments
-	private static final String KEY_STORE_FILE = "src/main/resources/rbac-server.keystore";
-	private static final String KEY_STORE_PASSWORD = "rbac-server";
-	private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
-	private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
+	private static final String KEY_STORE_FILE = "src/main/resources/rbac.keystore";
+	private static final String KEY_STORE_PASSWORD = "mypassrbac";
+    private static final String KEY_STORE_ALIAS_RBAC = "rbac"; 
 
     public Rbac()
     {
 
     }
 
-    //TODO: ADPTAR ESTA FUNC 
-    public Key requestCompartmentKey(Compartment compartment, String role) throws NoSuchPaddingException,
-        NoSuchAlgorithmException, InvalidKeyException, InvalidRoleException, KeyStoreException, IOException,
-        CertificateException, UnrecoverableKeyException, SignatureException, StatusRuntimeException 
+    public ValidatePermissionResponse generateResponse(String username, Role role, PermissionType permission) throws NoSuchPaddingException,
+        NoSuchAlgorithmException, InvalidKeyException, KeyStoreException, IOException,
+        CertificateException, UnrecoverableKeyException, SignatureException 
     {
         PrivateKey privateKey;
-        X509Certificate certificate;
 
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
 
-        if (role.equals(Role.ACCOUNT_MANAGER.toString())) {
-            privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
-            certificate = (X509Certificate) keyStore.getCertificate(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT);
-        }
-        else if (role.equals(Role.ENERGY_MANAGER.toString())) {
-            privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ENERGY_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
-            certificate = (X509Certificate) keyStore.getCertificate(KEY_STORE_ALIAS_ENERGY_MANAGEMENT);
-        }
-        else {
-            throw new InvalidRoleException(role);
-        }
+        privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_RBAC, KEY_STORE_PASSWORD.toCharArray());
+      
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");  
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime nowPlusSeconds = now.plusSeconds(30);
 
-        GetCompartmentKeyRequest.RequestData data = GetCompartmentKeyRequest.RequestData.newBuilder()
-                .setCompartment(compartment)
-                .setCertificate(ByteString.copyFrom(certificate.getEncoded()))
+        ValidatePermissionResponse.Ticket data = ValidatePermissionResponse.Ticket.newBuilder()
+                .setUsername(username)
+                .setRole(role)
+                .setPermission(permission)
+                .setRequestIssuedAt(dtf.format(now))
+                .setRequestValidUntil(dtf.format(nowPlusSeconds))
                 .build();
 
         ByteString signature = Security.signMessage(privateKey, data.toByteArray());
 
-        GetCompartmentKeyRequest request = GetCompartmentKeyRequest.newBuilder()
+        ValidatePermissionResponse response = ValidatePermissionResponse.newBuilder()
                 .setData(data)
                 .setSignature(signature)
                 .build();
 
-        GetCompartmentKeyResponse response = rbacserver.getCompartmentKey(request);
-
-        return Security.unwrapKey(privateKey, response.getKey().toByteArray());
+        return response;
     }
-
 
     /*
     ------------------------------------------------
@@ -86,12 +79,14 @@ public class Rbac {
     ------------------------------------------------
     */
 
-    public boolean validatePermissions(Role role, PermissionType permission) throws InvalidRoleException, 
-        PermissionDeniedException 
+    public ValidatePermissionResponse validatePermissions(String username, Role role, PermissionType permission) throws NoSuchPaddingException,
+        NoSuchAlgorithmException, InvalidKeyException, KeyStoreException, IOException,
+        CertificateException, UnrecoverableKeyException, SignatureException,
+        PermissionDeniedException, InvalidRoleException
     {
         if(PermissionsByRoles.containsKey(role)) {            
             if(PermissionsByRoles.get(role).equals(permission)) {
-                return true;
+                return generateResponse(username, role, permission);
             }
             else {
                 throw new PermissionDeniedException(role.name());

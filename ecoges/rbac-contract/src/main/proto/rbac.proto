@@ -8,7 +8,6 @@ option java_multiple_files = true;
 
 service RbacService {
 	rpc validatePermissions(ValidatePermissionRequest) returns (ValidatePermissionResponse);
-	rpc getCompartmentKey(GetCompartmentKeyRequest) returns (GetCompartmentKeyResponse);
 }
 
 enum Role {
@@ -22,28 +21,19 @@ enum PermissionType {
 }
 
 message ValidatePermissionRequest {
-	Role role = 1;
-	PermissionType permission = 2;
+	string username = 1;
+	Role role = 2;
+	PermissionType permission = 3;
 }
 
 message ValidatePermissionResponse {
-	bool ack = 1;
-}
-
-enum Compartment {
-	PERSONAL_INFO = 0;
-	ENERGY_PANEL = 1;
-}
-  
-message GetCompartmentKeyRequest {
-	message RequestData {
-		Compartment compartment = 1;
-		bytes certificate = 2;
+	message Ticket {
+		string username = 1;
+		Role role = 2;
+		PermissionType permission = 3;
+		string requestIssuedAt = 4;
+		string requestValidUntil = 5;
 	}
-	RequestData data = 1;
+	Ticket data = 1;
 	bytes signature = 2;
-}
-  
-message GetCompartmentKeyResponse {
-	bytes key = 1;
 }

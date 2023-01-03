@@ -288,15 +288,15 @@ public class Backoffice {
         return clients;
     }
 
-    public void validatePermission(String role, PermissionType permission) 
+    public void validatePermission(String username, String role, PermissionType permission) 
     {
         ValidatePermissionRequest request = ValidatePermissionRequest.newBuilder()
+            .setUsername(username)
             .setRole(Role.valueOf(role))
             .setPermission(permission)
             .build();
 
         ValidatePermissionResponse response = rbacserver.validatePermissions(request);
-
     }
 
     public PersonalInfo checkPersonalInfo(String username, String email, String hashedToken)
@@ -325,7 +325,7 @@ public class Backoffice {
             throw new AdminDoesNotExistException(username);
         }
 
-        validatePermission(role, PermissionType.PERSONAL_DATA);
+        validatePermission(username, role, PermissionType.PERSONAL_DATA);
 
         String personalInfoKeyString = requestCompartmentKey(Compartment.PERSONAL_INFO, role).toString();
 
@@ -389,7 +389,7 @@ public class Backoffice {
             throw new AdminDoesNotExistException(username);
         }
 
-        validatePermission(role, PermissionType.ENERGY_DATA);
+        validatePermission(username, role, PermissionType.ENERGY_DATA);
 
         String energyPanelKeyString = requestCompartmentKey(Compartment.ENERGY_PANEL, role).toString();
 
