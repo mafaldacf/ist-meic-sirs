@@ -8,10 +8,7 @@ import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.PersonalInfo;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.PlanType;
 
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.KeyGenerator;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
+import javax.crypto.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -49,7 +46,7 @@ public class ClientSessionTests {
     private static String token = "";
 
     @BeforeClass
-    public static void setup() throws ClassNotFoundException, SQLException, UnrecoverableKeyException, CertificateException, KeyStoreException, NoSuchAlgorithmException, IOException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, ClientAlreadyExistsException, InvalidKeyException {
+    public static void setup() throws ClassNotFoundException, SQLException, UnrecoverableKeyException, CertificateException, KeyStoreException, NoSuchAlgorithmException, IOException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, ClientAlreadyExistsException, InvalidKeyException, InvalidAlgorithmParameterException, BadPaddingException {
         loadKeysCertificates();
         setupDatabase();
         webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey);

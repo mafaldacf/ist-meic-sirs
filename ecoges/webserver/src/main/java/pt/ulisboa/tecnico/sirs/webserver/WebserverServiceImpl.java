@@ -5,8 +5,10 @@ import io.grpc.stub.StreamObserver;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
@@ -31,7 +33,8 @@ public class WebserverServiceImpl extends WebserverServiceGrpc.WebserverServiceI
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException | NoSuchAlgorithmException | IllegalBlockSizeException | NoSuchPaddingException | InvalidKeyException e){
+		} catch (SQLException | NoSuchAlgorithmException | IllegalBlockSizeException | NoSuchPaddingException |
+				 InvalidKeyException | InvalidAlgorithmParameterException | BadPaddingException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (ClientAlreadyExistsException e){
 			responseObserver.onError(Status.ALREADY_EXISTS.withDescription(e.getMessage()).asRuntimeException());
@@ -83,7 +86,8 @@ public class WebserverServiceImpl extends WebserverServiceGrpc.WebserverServiceI
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
+		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
+				 InvalidKeyException | InvalidAlgorithmParameterException | BadPaddingException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (ApplianceAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException | CompartmentKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
@@ -100,7 +104,8 @@ public class WebserverServiceImpl extends WebserverServiceGrpc.WebserverServiceI
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
+		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
+				 InvalidKeyException | InvalidAlgorithmParameterException | BadPaddingException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (SolarPanelAlreadyExistsException | InvalidSessionTokenException | ClientDoesNotExistException | CompartmentKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
@@ -117,7 +122,8 @@ public class WebserverServiceImpl extends WebserverServiceGrpc.WebserverServiceI
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
+		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
+				 InvalidKeyException | InvalidAlgorithmParameterException | BadPaddingException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
@@ -136,7 +142,8 @@ public class WebserverServiceImpl extends WebserverServiceGrpc.WebserverServiceI
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
+		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
+				 InvalidKeyException | InvalidAlgorithmParameterException | BadPaddingException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
@@ -155,7 +162,8 @@ public class WebserverServiceImpl extends WebserverServiceGrpc.WebserverServiceI
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException e){
+		} catch (SQLException | InvalidAlgorithmParameterException | IllegalBlockSizeException |
+				 NoSuchPaddingException | NoSuchAlgorithmException | BadPaddingException | InvalidKeyException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidSessionTokenException | ClientDoesNotExistException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
@@ -171,7 +179,8 @@ public class WebserverServiceImpl extends WebserverServiceGrpc.WebserverServiceI
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
+		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
+				 InvalidKeyException | InvalidAlgorithmParameterException | BadPaddingException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidSessionTokenException | ClientDoesNotExistException | CompartmentKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
@@ -187,7 +196,8 @@ public class WebserverServiceImpl extends WebserverServiceGrpc.WebserverServiceI
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException e){
+		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
+				 InvalidKeyException | InvalidAlgorithmParameterException | BadPaddingException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidSessionTokenException | ClientDoesNotExistException | CompartmentKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());

@@ -14,12 +14,10 @@ import io.grpc.netty.GrpcSslContexts;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import pt.ulisboa.tecnico.sirs.security.Security;
+import pt.ulisboa.tecnico.sirs.webserver.exceptions.ClientDoesNotExistException;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.PlanType;
 
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.KeyGenerator;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
+import javax.crypto.*;
 
 import static io.grpc.netty.NettyServerBuilder.*;
 import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
@@ -121,7 +119,7 @@ public class WebserverMain {
 					.addService(new WebserverBackofficeServiceImpl(webserver))
 					.build();
 			server.start();
-			System.out.println("Listening on port " + serverPort + "...");
+			System.out.println("Listening on port " + serverPort + "...\n");
 
 			// Automatically generate invoices at each 15 seconds
 			Timer time = new Timer();
@@ -212,13 +210,13 @@ public class WebserverMain {
 			}
 
 			statement = dbConnection.createStatement();
+
 			statement.execute(DROP_INVOICE_TABLE);
 			statement.execute(DROP_SOLAR_PANEL_TABLE);
 			statement.execute(DROP_APPLIANCE_TABLE);
 			statement.execute(DROP_CLIENT_TABLE);
 			statement.execute(DROP_COMPARTMENT_KEYS_TABLE);
 
-			statement = dbConnection.createStatement();
 			statement.execute(CREATE_CLIENT_TABLE);
 			statement.execute(CREATE_APPLIANCE_TABLE);
 			statement.execute(CREATE_SOLAR_PANEL_TABLE);
@@ -249,7 +247,28 @@ public class WebserverMain {
 			}
 		}
 
-		public void addInvoice(int client_id, float energyConsumed, float energyConsumedDaytime, float energyConsumedNight, String plan) {
+		public byte[] getIv(String email) throws SQLException, ClientDoesNotExistException {
+			PreparedStatement st;
+			ResultSet rs;
+			byte[] iv;
+
+			st = dbConnection.prepareStatement(READ_CLIENT_IV);
+			st.setString(1, email);
+			rs = st.executeQuery();
+
+			if (rs.next()) {
+				iv = rs.getBytes(1);
+			}
+			else {
+				st.close();
+				throw new ClientDoesNotExistException(email);
+			}
+
+			st.close();
+			return iv;
+		}
+
+		public void addInvoice(int client_id, float energyConsumed, float energyConsumedDaytime, float energyConsumedNight, String plan) throws NoSuchAlgorithmException, SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, BadPaddingException, InvalidKeyException {
 			PreparedStatement st;
 			float paymentAmount;
 
@@ -262,46 +281,49 @@ public class WebserverMain {
 
 			paymentAmount = paymentAmount + paymentAmount * TAXES/100;
 
-			try {
-				st = dbConnection.prepareStatement(CREATE_INVOICE);
-				st.setInt(1, client_id);
-				st.setInt(2, currYear);
-				st.setInt(3, currMonth);
-				st.setFloat(4, paymentAmount);
-				st.setFloat(5, energyConsumed);
-				st.setFloat(6, energyConsumedDaytime);
-				st.setFloat(7, energyConsumedNight);
-				st.setString(8, plan);
-				st.setInt(9, TAXES);
-				st.executeUpdate();
+			byte[] iv = Security.generateRandom();
 
-			} catch (SQLException e) {
-				System.out.println(e.getMessage());
-			}
+			st = dbConnection.prepareStatement(CREATE_INVOICE);
+			st.setBytes(1, iv);
+			st.setInt(2, client_id);
+			st.setInt(3, currYear);
+			st.setInt(4, currMonth);
+			st.setString(5, plan);
+			st.setInt(6, TAXES);
+
+			st.setBytes(7, Security.encryptData(Float.toString(paymentAmount), energyPanelKey, iv));
+			st.setBytes(8, Security.encryptData(Float.toString(energyConsumed), energyPanelKey, iv));
+			st.setBytes(9, Security.encryptData(Float.toString(energyConsumedDaytime), energyPanelKey, iv));
+			st.setBytes(10, Security.encryptData(Float.toString(energyConsumedNight), energyPanelKey, iv));
+
+			st.executeUpdate();
 		}
 		@Override
 		public void run() {
-			System.out.println("\nGenerating new invoices for " + months.get(currMonth) + " " + currYear);
 			PreparedStatement st;
 			ResultSet rs;
 			try {
 				st = dbConnection.prepareStatement(READ_ALL_CLIENTS_ID_ENERGY_CONSUMPTION_PLAN);
-				st.setString(1, energyPanelKey.toString());
-				st.setString(2, energyPanelKey.toString());
-				st.setString(3, energyPanelKey.toString());
-				st.setString(4, personalInfoKey.toString());
 				rs = st.executeQuery();
 
 				while (rs.next()) {
 					int client_id = rs.getInt(1);
-					float energyConsumed = rs.getFloat(2);
-					float energyConsumedDaytime = rs.getFloat(3);
-					float energyConsumedNight = rs.getFloat(4);
-					String plan = rs.getString(5);
+					String plan = rs.getString(2);
+					byte[] iv = rs.getBytes(3);
+
+					byte[] energyConsumedBytes = Security.decryptData(rs.getBytes(4), energyPanelKey, iv);
+					byte[] energyConsumedDaytimeBytes = Security.decryptData(rs.getBytes(5), energyPanelKey, iv);
+					byte[] energyConsumedNightBytes = Security.decryptData(rs.getBytes(6), energyPanelKey, iv);
+
+					float energyConsumed = Float.parseFloat(new String(energyConsumedBytes));
+					float energyConsumedDaytime = Float.parseFloat(new String(energyConsumedDaytimeBytes));
+					float energyConsumedNight = Float.parseFloat(new String(energyConsumedNightBytes));
+
 					addInvoice(client_id, energyConsumed, energyConsumedDaytime, energyConsumedNight, plan);
 				}
 				incrNextDate();
-			} catch (RuntimeException | SQLException e) {
+			} catch (RuntimeException | SQLException | NoSuchAlgorithmException | InvalidAlgorithmParameterException |
+					 IllegalBlockSizeException | NoSuchPaddingException | BadPaddingException | InvalidKeyException e) {
 				System.out.println("Could not generate invoices: " + e.getMessage());
 			}
 

@@ -10,28 +10,23 @@ public class DatabaseQueries {
         "token VARCHAR(64) DEFAULT ''," +
         "role VARCHAR(25) NOT NULL," + // ACCOUNT_MANAGER, ENERGY_MANAGER
         "UNIQUE (username)," +
-        "PRIMARY KEY (id))" +
-        ""; // TODO: remove this and add encryption when deploying on linux
-        //" ENGINE=InnoDB ENCRYPTION='Y'";
+        "PRIMARY KEY (id))";
 
     public static final String CREATE_ADMIN = "INSERT INTO admin(username, password, role) VALUES(?, ?, ?)";
-    public static final String CREATE_ACCOUNT_MANAGER_PERMISSION = "INSERT INTO permission(role, personal_info, energy_panel) VALUES('ACCOUNT_MANAGER', ?, ?)";
-    public static final String CREATE_ENERGY_MANAGER_PERMISSION = "INSERT INTO permission(role, personal_info, energy_panel) VALUES('ENERGY_MANAGER', ?, ?)";
-
-    public static final String READ_PERMISSION_COUNT = "SELECT COUNT(*) FROM permission";
 
     public static final String READ_ADMIN_PASSWORD_ROLE = "SELECT password, role FROM admin WHERE username = ?";
     public static final String READ_ADMIN_ROLE = "SELECT role FROM admin WHERE username = ?";
 
     public static final String READ_CLIENT_ID = "SELECT id FROM client WHERE email = ?";
-    public static final String READ_CLIENT_ENERGY_PANEL = "SELECT AES_DECRYPT(energyConsumed, ?), AES_DECRYPT(energyConsumedDaytime, ?), AES_DECRYPT(energyConsumedNight, ?), AES_DECRYPT(energyProduced, ?) FROM client WHERE email = ? ";
+    public static final String READ_CLIENT_ENERGY_PANEL = "SELECT energyConsumed, energyConsumedDaytime, energyConsumedNight, energyProduced FROM client WHERE email = ? ";
+    public static final String READ_CLIENT_IV = "SELECT iv FROM client WHERE email = ?";
 
     public static final String READ_ADMIN_TOKEN = "SELECT token FROM admin WHERE username = ?";
 
-    public static final String READ_APPLIANCES = "SELECT name, brand, AES_DECRYPT(energyConsumed, ?), AES_DECRYPT(energyConsumedDaytime, ?), AES_DECRYPT(energyConsumedNight, ?) FROM appliance WHERE client_id = ? ";
-    public static final String READ_SOLAR_PANELS = "SELECT name, brand, AES_DECRYPT(energyProduced, ?) FROM solarpanel WHERE client_id = ? ";
+    public static final String READ_APPLIANCES = "SELECT iv, name, brand, energyConsumed, energyConsumedDaytime, energyConsumedNight FROM appliance WHERE client_id = ? ";
+    public static final String READ_SOLAR_PANELS = "SELECT iv, name, brand, energyProduced FROM solarpanel WHERE client_id = ? ";
 
-    public static final String READ_CLIENT_PERSONAL_INFO = "SELECT name, email, AES_DECRYPT(address, ?), AES_DECRYPT(iban, ?), AES_DECRYPT(plan, ?) FROM client WHERE email = ?";
+    public static final String READ_CLIENT_PERSONAL_INFO = "SELECT name, email, plan, address, iban FROM client WHERE email = ?";
 
     public static final String READ_ADMIN_COUNT = "SELECT COUNT(*) FROM admin WHERE username = ?";
     public static final String READ_ALL_CLIENTS_NAME_EMAIL = "SELECT name, email FROM client";

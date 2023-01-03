@@ -6,6 +6,7 @@ import io.grpc.stub.StreamObserver;
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.*;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import java.io.IOException;
@@ -106,7 +107,7 @@ public class BackofficeServiceImpl extends BackofficeServiceGrpc.BackofficeServi
 			responseObserver.onCompleted();
 		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
 				 UnrecoverableKeyException | CertificateException | KeyStoreException | SignatureException |
-				 InvalidKeyException | IOException e){
+				 InvalidKeyException | IOException | InvalidAlgorithmParameterException | BadPaddingException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidRoleException | InvalidSessionTokenException | CompartmentKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
@@ -131,7 +132,7 @@ public class BackofficeServiceImpl extends BackofficeServiceGrpc.BackofficeServi
 			responseObserver.onCompleted();
 		} catch (SQLException | IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException |
 				 UnrecoverableKeyException | CertificateException | KeyStoreException | SignatureException |
-				 InvalidKeyException | IOException e){
+				 InvalidKeyException | IOException | InvalidAlgorithmParameterException | BadPaddingException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidRoleException | InvalidSessionTokenException | CompartmentKeyException e){
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());

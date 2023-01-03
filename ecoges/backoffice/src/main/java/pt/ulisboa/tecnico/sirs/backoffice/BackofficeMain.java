@@ -114,7 +114,7 @@ public class BackofficeMain {
 					.addService(new BackofficeServiceImpl(backofficeServer))
 					.build();
 			server.start();
-			System.out.println("Listening on port " + serverPort + "...");
+			System.out.println("Listening on port " + serverPort + "...\n");
 
 
 			// Do not exit the main thread. Wait until server is terminated.

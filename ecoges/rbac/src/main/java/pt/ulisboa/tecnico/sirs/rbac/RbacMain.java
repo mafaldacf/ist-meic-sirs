@@ -72,7 +72,7 @@ public class RbacMain {
 			Server server = NettyServerBuilder.forPort(serverPort).sslContext(sslContext)
 					.addService(new RbacServiceImpl(rbacServer)).build();
 			server.start();
-			System.out.println("Listening on port " + serverPort + "...");
+			System.out.println("Listening on port " + serverPort + "...\n");
 
 			// Do not exit the main thread. Wait until server is terminated.
 			server.awaitTermination();

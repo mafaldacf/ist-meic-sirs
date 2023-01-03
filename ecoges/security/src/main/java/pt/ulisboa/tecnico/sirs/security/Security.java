@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import pt.ulisboa.tecnico.sirs.security.exceptions.WeakPasswordException;
 
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.cert.*;
@@ -22,7 +23,7 @@ public class Security {
                 "(?=.*[A-Z])" + // at least one uppercase
                 "(?=.*[!@#&()–[{}]:;',?/*~$^+=<>])" + // at least one special character
                 "." + // matches anything
-                "{10,30}" + // length of 10 to 30 characters
+                "{10,50}" + // length of 10 to 30 characters
                 "$" + // end of line
                 "";
         Pattern pattern = Pattern.compile(regex);
@@ -58,9 +59,9 @@ public class Security {
         return bytesToHex(bytes);
     }
 
-    public static byte[] generateSalt() throws NoSuchAlgorithmException {
+    public static byte[] generateRandom() throws NoSuchAlgorithmException {
         SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
-        byte[] bytes = new byte[20];
+        byte[] bytes = new byte[16];
         random.nextBytes(bytes);
         return bytes;
     }
@@ -77,10 +78,28 @@ public class Security {
         return hexString.toString();
     }
 
-    public static byte[] wrapKey(PublicKey publicKey, Key secretKey) throws InvalidKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException {
+    public static byte[] encryptData(String plainText, SecretKey key, byte[] iv) throws IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidAlgorithmParameterException, InvalidKeyException {
+        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);
+
+        return cipher.doFinal(plainText.getBytes());
+    }
+
+    public static byte[] decryptData(byte[] cipherText, SecretKey key, byte[] iv) throws IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidAlgorithmParameterException, InvalidKeyException {
+        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, key, ivSpec);
+
+        return cipher.doFinal(cipherText);
+    }
+
+    public static byte[] wrapKey(PublicKey publicKey, SecretKey key) throws InvalidKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException {
         Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
         cipher.init(Cipher.WRAP_MODE, publicKey);
-        return cipher.wrap(secretKey);
+        return cipher.wrap(key);
     }
 
     public static SecretKey unwrapKey(PrivateKey privateKey, byte[] wrappedSecretKey) throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {

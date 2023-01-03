@@ -21,10 +21,10 @@ CREATE TABLE clientdb.client (id INTEGER NOT NULL AUTO_INCREMENT,
     energyConsumedNight BLOB, 
     energyProduced BLOB, 
     token VARCHAR(64) DEFAULT '', 
-    salt BLOB, 
+    salt BLOB, -- password hash
+    iv BLOB, -- initialization vector using in AES encryption with CBC mode
     UNIQUE (email), 
-    PRIMARY KEY (id))
-     ENGINE=InnoDB ENCRYPTION='Y'; 
+    PRIMARY KEY (id)); 
 
 CREATE TABLE clientdb.appliance (
     id INTEGER NOT NULL AUTO_INCREMENT,
@@ -34,10 +34,10 @@ CREATE TABLE clientdb.appliance (
     energyConsumed BLOB,
     energyConsumedDaytime BLOB,
     energyConsumedNight BLOB,
+    iv BLOB, -- initialization vector using in AES encryption with CBC mode
     UNIQUE (client_id, name, brand),
     PRIMARY KEY (id),
-    FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)
-     ENGINE=InnoDB ENCRYPTION='Y';
+    FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE);
 
 CREATE TABLE clientdb.solarpanel (
     id INTEGER NOT NULL AUTO_INCREMENT,
@@ -45,10 +45,10 @@ CREATE TABLE clientdb.solarpanel (
     name VARCHAR(150) NOT NULL,
     brand VARCHAR(150) NOT NULL,
     energyProduced BLOB,
+    iv BLOB, -- initialization vector using in AES encryption with CBC mode
     UNIQUE (client_id, name, brand),
     PRIMARY KEY (id),
-    FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)
-     ENGINE=InnoDB ENCRYPTION='Y';
+    FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE);
 
 CREATE TABLE clientdb.invoice (
     id INTEGER NOT NULL AUTO_INCREMENT,
@@ -61,17 +61,16 @@ CREATE TABLE clientdb.invoice (
     energyConsumedNight DECIMAL(25, 2) NOT NULL,
     plan VARCHAR(15) NOT NULL,
     taxes INTEGER NOT NULL,
+    iv BLOB, -- initialization vector using in AES encryption with CBC mode
     UNIQUE (client_id, year, month),
     PRIMARY KEY (id),
-    FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE)
-     ENGINE=InnoDB ENCRYPTION='Y';
+    FOREIGN KEY (client_id) REFERENCES client(id) ON DELETE CASCADE);
 
 CREATE TABLE clientdb.compartment_keys (
     id INTEGER NOT NULL AUTO_INCREMENT,
     personal_info_key BLOB NOT NULL,
     energy_panel_key BLOB NOT NULL,
-    PRIMARY KEY (id))
-     ENGINE=InnoDB ENCRYPTION='Y';
+    PRIMARY KEY (id));
 
 -- backoffice
 
@@ -83,5 +82,4 @@ CREATE TABLE clientdb.admin (id INTEGER NOT NULL AUTO_INCREMENT,
     token VARCHAR(64) DEFAULT '',
     role VARCHAR(25) NOT NULL, -- ACCOUNT_MANAGER, ENERGY_MANAGER
     UNIQUE (username),
-    PRIMARY KEY (id))
-     ENGINE=InnoDB ENCRYPTION='Y';
+    PRIMARY KEY (id));
