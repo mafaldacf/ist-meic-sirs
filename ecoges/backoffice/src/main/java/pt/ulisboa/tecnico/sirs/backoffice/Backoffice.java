@@ -7,13 +7,15 @@ import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import pt.ulisboa.tecnico.sirs.backoffice.grpc.Appliance;
+import pt.ulisboa.tecnico.sirs.backoffice.grpc.EnergyPanel;
+import pt.ulisboa.tecnico.sirs.backoffice.grpc.PersonalInfo;
+import pt.ulisboa.tecnico.sirs.backoffice.grpc.PlanType;
+import pt.ulisboa.tecnico.sirs.backoffice.grpc.SolarPanel;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.*;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.Compartment;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.GetCompartmentKeyRequest;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.GetCompartmentKeyResponse;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.WebserverBackofficeServiceGrpc;
+import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 import pt.ulisboa.tecnico.sirs.rbac.grpc.*;
 
 import javax.crypto.BadPaddingException;
@@ -88,13 +90,25 @@ public class Backoffice {
 
     /*
     ------------------------------------------------
-    -------- WEBSERVER BACKOFFICE SERVICE ----------
+    ------- WEBSERVER - BACKOFFICE SERVICE ---------
     ------------------------------------------------
     */
 
-    public SecretKey requestCompartmentKey(Compartment compartment, String role) throws NoSuchPaddingException,
-            NoSuchAlgorithmException, InvalidKeyException, InvalidRoleException, KeyStoreException, IOException,
-            CertificateException, UnrecoverableKeyException, SignatureException, StatusRuntimeException {
+    public GetCompartmentKeyRequest.Ticket convertTicket(ValidatePermissionResponse.Ticket ticket) {
+        return GetCompartmentKeyRequest.Ticket.newBuilder()
+                .setUsername(ticket.getUsername())
+                .setRole(RoleTypes.valueOf(ticket.getRole().name()))
+                .setCompartment(Compartment.valueOf(ticket.getPermission().name()))
+                .setRequestIssuedAt(ticket.getRequestIssuedAt())
+                .setRequestValidUntil(ticket.getRequestValidUntil())
+                .build();
+    }
+
+    public SecretKey requestCompartmentKey(String username, Compartment compartment, String role,
+                                           ValidatePermissionResponse.Ticket ticket, ByteString signatureRBAC) throws
+            NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidRoleException,
+            KeyStoreException, IOException, CertificateException, UnrecoverableKeyException, SignatureException,
+            StatusRuntimeException {
 
         PrivateKey privateKey;
         X509Certificate certificate;
@@ -115,6 +129,8 @@ public class Backoffice {
         }
 
         GetCompartmentKeyRequest.RequestData data = GetCompartmentKeyRequest.RequestData.newBuilder()
+                .setUsername(username)
+                .setRole(RoleTypes.valueOf(role))
                 .setCompartment(compartment)
                 .setCertificate(ByteString.copyFrom(certificate.getEncoded()))
                 .build();
@@ -124,6 +140,9 @@ public class Backoffice {
         GetCompartmentKeyRequest request = GetCompartmentKeyRequest.newBuilder()
                 .setData(data)
                 .setSignature(signature)
+                .setTicket(convertTicket(ticket))
+                .setSignatureRBAC(signatureRBAC)
+                .setTicketBytes(ticket.toByteString())
                 .build();
 
         GetCompartmentKeyResponse response = webserver.getCompartmentKey(request);
@@ -289,7 +308,7 @@ public class Backoffice {
         return clients;
     }
 
-    public void validatePermission(String username, String role, PermissionType permission) 
+    public ValidatePermissionResponse validatePermission(String username, String role, PermissionType permission)
     {
         ValidatePermissionRequest request = ValidatePermissionRequest.newBuilder()
             .setUsername(username)
@@ -297,14 +316,15 @@ public class Backoffice {
             .setPermission(permission)
             .build();
 
-        ValidatePermissionResponse response = rbacserver.validatePermissions(request);
+        return rbacserver.validatePermissions(request);
     }
 
     public PersonalInfo checkPersonalInfo(String username, String clientEmail, String hashedToken)
             throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException, AdminDoesNotExistException,
             InvalidRoleException, PermissionDeniedException, CompartmentKeyException, IllegalBlockSizeException,
             NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, UnrecoverableKeyException,
-            CertificateException, KeyStoreException, IOException, SignatureException, StatusRuntimeException, InvalidAlgorithmParameterException, BadPaddingException {
+            CertificateException, KeyStoreException, IOException, SignatureException, StatusRuntimeException,
+            InvalidAlgorithmParameterException, BadPaddingException {
 
         PersonalInfo personalInfo;
         PreparedStatement st;
@@ -325,9 +345,9 @@ public class Backoffice {
             throw new AdminDoesNotExistException(username);
         }
 
-        validatePermission(username, role, PermissionType.PERSONAL_DATA);
+        ValidatePermissionResponse response = validatePermission(username, role, PermissionType.PERSONAL_DATA);
 
-        SecretKey personalInfoKey = requestCompartmentKey(Compartment.PERSONAL_INFO, role);
+        SecretKey personalInfoKey = requestCompartmentKey(username, Compartment.PERSONAL_DATA, role, response.getData(), response.getSignature());
 
         byte[] iv = getIv(clientEmail);
 
@@ -389,9 +409,9 @@ public class Backoffice {
             throw new AdminDoesNotExistException(username);
         }
 
-        validatePermission(username, role, PermissionType.ENERGY_DATA);
+        ValidatePermissionResponse response = validatePermission(username, role, PermissionType.ENERGY_DATA);
 
-        SecretKey energyPanelKey = requestCompartmentKey(Compartment.ENERGY_PANEL, role);
+        SecretKey energyPanelKey = requestCompartmentKey(username, Compartment.ENERGY_DATA, role, response.getData(), response.getSignature());
 
         byte[] iv = getIv(clientEmail);
 

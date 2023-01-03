@@ -57,7 +57,13 @@
 			<version>1.60</version>
 			<scope>test</scope>
 		</dependency>
-    </dependencies>
+		<dependency>
+			<groupId>pt.ulisboa.tecnico.sirs</groupId>
+			<artifactId>rbac</artifactId>
+			<version>1.0.0-SNAPSHOT</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
 
 	<build>
 		<!-- Resources are files like properties, images, etc; used by the module.  -->

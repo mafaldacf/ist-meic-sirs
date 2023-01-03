@@ -2,12 +2,18 @@ package pt.ulisboa.tecnico.sirs.webserver;
 
 import com.google.protobuf.ByteString;
 import org.junit.*;
+import pt.ulisboa.tecnico.sirs.rbac.Rbac;
+import pt.ulisboa.tecnico.sirs.rbac.exceptions.InvalidRoleException;
+import pt.ulisboa.tecnico.sirs.rbac.exceptions.PermissionDeniedException;
+import pt.ulisboa.tecnico.sirs.rbac.grpc.PermissionType;
+import pt.ulisboa.tecnico.sirs.rbac.grpc.Role;
+import pt.ulisboa.tecnico.sirs.rbac.grpc.ValidatePermissionRequest;
+import pt.ulisboa.tecnico.sirs.rbac.grpc.ValidatePermissionResponse;
 import pt.ulisboa.tecnico.sirs.security.Security;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.CompartmentKeyException;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.InvalidCertificateChainException;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.InvalidSignatureException;
+import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.Compartment;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.GetCompartmentKeyRequest;
+import pt.ulisboa.tecnico.sirs.webserver.grpc.RoleTypes;
 
 import javax.crypto.*;
 import java.security.*;
@@ -29,6 +35,7 @@ import java.security.PrivateKey;
 public class RequestCompartmentKeysTests {
 
     private static Webserver webserver;
+    private static Rbac rbac;
 
     private static X509Certificate testCertificate;
     private static PrivateKey testPrivateKey;
@@ -57,38 +64,50 @@ public class RequestCompartmentKeysTests {
         generateCompartmentKeys();
 
         webserver = new Webserver(personalInfoKey, energyPanelKey);
+        rbac = new Rbac("../rbac/src/main/resources/rbac.keystore");
     }
-
     @Test
-    public void requestCompartmentKeyAMTest() throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, CertificateException, KeyStoreException, IOException, UnrecoverableKeyException, InvalidSignatureException, InvalidAlgorithmParameterException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidCertificateChainException, InvalidKeySpecException, BadPaddingException {
+    public void requestCompartmentKeyAMTest() throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, CertificateException, KeyStoreException, IOException, UnrecoverableKeyException, InvalidSignatureException, InvalidAlgorithmParameterException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidCertificateChainException, InvalidKeySpecException, BadPaddingException, PermissionDeniedException, InvalidRoleException, InvalidTicketUsernameException, InvalidTicketCompartmentException, InvalidTicketIssuedTimeException, InvalidTicketRoleException, InvalidTicketValidityTimeException {
         loadAMDepartmentCertificate();
 
+        // request permission to RBAC
+        ValidatePermissionResponse response = rbac.validatePermissions("account manager", Role.ACCOUNT_MANAGER, PermissionType.PERSONAL_DATA);
+
+        // request compartment keys
         GetCompartmentKeyRequest.RequestData data = GetCompartmentKeyRequest.RequestData.newBuilder()
-                .setCompartment(Compartment.PERSONAL_INFO)
+                .setUsername("account manager")
+                .setRole(RoleTypes.ACCOUNT_MANAGER)
+                .setCompartment(Compartment.PERSONAL_DATA)
                 .setCertificate(ByteString.copyFrom(AMCertificate.getEncoded()))
                 .build();
 
         ByteString signature = Security.signMessage(AMPrivateKey, data.toByteArray());
 
-        byte[] wrappedKey = webserver.getCompartmentKey(data, signature);
-        Assert.assertNotNull(wrappedKey);
+        byte[] wrappedKey = webserver.getCompartmentKey(data, signature, convertTicket(response.getData()),
+                response.getSignature(), response.getData().toByteString());
 
         SecretKey key = Security.unwrapKey(AMPrivateKey, wrappedKey);
         Assert.assertEquals(personalInfoKey, key);
     }
     @Test
-    public void requestCompartmentKeyEMTest() throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, CertificateException, KeyStoreException, IOException, UnrecoverableKeyException, InvalidSignatureException, InvalidAlgorithmParameterException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidCertificateChainException, InvalidKeySpecException, BadPaddingException {
+    public void requestCompartmentKeyEMTest() throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, CertificateException, KeyStoreException, IOException, UnrecoverableKeyException, InvalidSignatureException, InvalidAlgorithmParameterException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidCertificateChainException, InvalidKeySpecException, BadPaddingException, PermissionDeniedException, InvalidRoleException, InvalidTicketUsernameException, InvalidTicketCompartmentException, InvalidTicketIssuedTimeException, InvalidTicketRoleException, InvalidTicketValidityTimeException {
         loadEMDepartmentCertificate();
 
+        // request permission to RBAC
+        ValidatePermissionResponse response = rbac.validatePermissions("energy manager", Role.ENERGY_MANAGER, PermissionType.ENERGY_DATA);
+
+        // request compartment keys
         GetCompartmentKeyRequest.RequestData data = GetCompartmentKeyRequest.RequestData.newBuilder()
-                .setCompartment(Compartment.ENERGY_PANEL)
+                .setUsername("energy manager")
+                .setRole(RoleTypes.ENERGY_MANAGER)
+                .setCompartment(Compartment.ENERGY_DATA)
                 .setCertificate(ByteString.copyFrom(EMCertificate.getEncoded()))
                 .build();
 
         ByteString signature = Security.signMessage(EMPrivateKey, data.toByteArray());
 
-        byte[] wrappedKey = webserver.getCompartmentKey(data, signature);
-        Assert.assertNotNull(wrappedKey);
+        byte[] wrappedKey = webserver.getCompartmentKey(data, signature, convertTicket(response.getData()),
+                response.getSignature(), response.getData().toByteString());
 
         SecretKey key = Security.unwrapKey(EMPrivateKey, wrappedKey);
         Assert.assertEquals(energyPanelKey, key);
@@ -97,14 +116,14 @@ public class RequestCompartmentKeysTests {
     @Test
     public void requestCompartmentKeyWithInvalidCertificateChainTest() throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, CertificateEncodingException {
         GetCompartmentKeyRequest.RequestData data = GetCompartmentKeyRequest.RequestData.newBuilder()
-                .setCompartment(Compartment.PERSONAL_INFO)
+                .setCompartment(Compartment.PERSONAL_DATA)
                 .setCertificate(ByteString.copyFrom(testCertificate.getEncoded()))
                 .build();
 
         ByteString signature = Security.signMessage(testPrivateKey, data.toByteArray());
 
         Assert.assertThrows(InvalidCertificateChainException.class, () ->
-            webserver.getCompartmentKey(data, signature));
+            webserver.getCompartmentKey(data, signature, null, null, null));
     }
 
     @Test
@@ -119,14 +138,14 @@ public class RequestCompartmentKeysTests {
 
 
         GetCompartmentKeyRequest.RequestData data = GetCompartmentKeyRequest.RequestData.newBuilder()
-                .setCompartment(Compartment.PERSONAL_INFO)
+                .setCompartment(Compartment.PERSONAL_DATA)
                 .setCertificate(ByteString.copyFrom(testCertificate.getEncoded()))
                 .build();
 
         ByteString signature = Security.signMessage(privateKey, data.toByteArray());
 
         Assert.assertThrows(InvalidSignatureException.class, () ->
-            webserver.getCompartmentKey(data, signature));
+            webserver.getCompartmentKey(data, signature, null, null, null));
     }
 
     public static void loadAMDepartmentCertificate() throws IOException, KeyStoreException, UnrecoverableKeyException, NoSuchAlgorithmException, CertificateException {
@@ -163,5 +182,15 @@ public class RequestCompartmentKeysTests {
 
         testPrivateKey = (PrivateKey) keyStore.getKey(TEST_KEY_STORE_ALIAS_TEST, TEST_KEY_STORE_PASSWORD.toCharArray());
         testCertificate = (X509Certificate) keyStore.getCertificate(TEST_KEY_STORE_ALIAS_TEST);
+    }
+
+    public GetCompartmentKeyRequest.Ticket convertTicket(ValidatePermissionResponse.Ticket ticket) {
+        return GetCompartmentKeyRequest.Ticket.newBuilder()
+                .setUsername(ticket.getUsername())
+                .setRole(RoleTypes.valueOf(ticket.getRole().name()))
+                .setCompartment(Compartment.valueOf(ticket.getPermission().name()))
+                .setRequestIssuedAt(ticket.getRequestIssuedAt())
+                .setRequestValidUntil(ticket.getRequestValidUntil())
+                .build();
     }
 }

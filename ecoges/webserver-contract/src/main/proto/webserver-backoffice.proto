@@ -11,17 +11,37 @@ service WebserverBackofficeService {
 }
 
 enum Compartment {
-  PERSONAL_INFO = 0;
-  ENERGY_PANEL = 1;
+  PERSONAL_DATA = 0;
+  ENERGY_DATA = 1;
+}
+
+enum RoleTypes {
+  ACCOUNT_MANAGER = 0;
+  ENERGY_MANAGER = 1;
 }
 
 message GetCompartmentKeyRequest {
   message RequestData {
-    Compartment compartment = 1;
-    bytes certificate = 2;
+    string username = 1;
+    RoleTypes role = 2;
+    Compartment compartment = 3;
+    bytes certificate = 4;
   }
-  RequestData data = 1;
-  bytes signature = 2;
+  message Ticket {
+    string username = 1;
+    RoleTypes role = 2;
+    Compartment compartment = 3;
+    string requestIssuedAt = 4;
+    string requestValidUntil = 5;
+  }
+
+  RequestData data = 2;
+  bytes signature = 3;
+  Ticket ticket = 4;
+  bytes signatureRBAC = 5;
+
+  // ticket was converted to current protobuf Ticket type and we need the original bytes to later verify the signature of RBAC
+  bytes ticketBytes = 6;
 }
 
 message GetCompartmentKeyResponse {

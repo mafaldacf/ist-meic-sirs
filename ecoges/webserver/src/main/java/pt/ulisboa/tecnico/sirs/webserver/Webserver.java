@@ -17,6 +17,8 @@ import java.security.*;
 import java.security.cert.*;
 import java.security.spec.InvalidKeySpecException;
 import java.sql.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,6 +35,7 @@ public class Webserver {
     private static final String TRUST_STORE_FILE = "src/main/resources/webserver.truststore";
     private static final String TRUST_STORE_PASSWORD = "mypasswebserver";
     private static final String TRUST_STORE_ALIAS_CA = "ca";
+    private static final String TRUST_STORE_ALIAS_RBAC = "rbac";
 
     // Compartments
     private final SecretKey personalInfoKey;
@@ -55,20 +58,19 @@ public class Webserver {
     -----------------------------------------------
      */
 
-    public byte[] getCompartmentKey(GetCompartmentKeyRequest.RequestData data, ByteString signature) throws CompartmentKeyException,
-            IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException,
-            InvalidKeySpecException, SignatureException, InvalidSignatureException, BadPaddingException,
-            KeyStoreException, IOException, InvalidAlgorithmParameterException,
-            InvalidCertificateChainException, CertificateException {
+    public PublicKey verifyDepartmentRequest(GetCompartmentKeyRequest.RequestData data, ByteString signature)
+            throws CertificateException, InvalidSignatureException, KeyStoreException, IOException,
+            InvalidAlgorithmParameterException, NoSuchAlgorithmException, InvalidCertificateChainException,
+            SignatureException, InvalidKeyException {
 
-        Compartment compartment = data.getCompartment();
         byte[] certificateBytes = data.getCertificate().toByteArray();
 
+        // Retrieve department certificate from the request
         CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
         X509Certificate departmentCertificate = (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(certificateBytes));
         PublicKey departmentPublicKey = departmentCertificate.getPublicKey();
 
-        // Verify authenticity and integrity
+        // Verify authenticity and integrity of the request
         if (!Security.verifySignature(departmentPublicKey, signature.toByteArray(), data.toByteArray())) {
             throw new InvalidSignatureException();
         }
@@ -82,14 +84,71 @@ public class Webserver {
             throw new InvalidCertificateChainException();
         }
 
-        // TODO: Validate signature of access control infrastructure (the response should be signed)
+        return departmentPublicKey;
+    }
 
-        // Get compartment keys
+    public void verifyRBACResponse(GetCompartmentKeyRequest.Ticket ticket, ByteString ticketBytes,
+                                   ByteString signatureRBAC, GetCompartmentKeyRequest.RequestData request)
+            throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException, SignatureException,
+            InvalidKeyException, InvalidSignatureException, InvalidTicketUsernameException, InvalidTicketRoleException,
+            InvalidTicketCompartmentException, InvalidTicketIssuedTimeException, InvalidTicketValidityTimeException {
 
-        if (compartment.equals(Compartment.PERSONAL_INFO)) {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+
+        // Retrieve RBAC certificate from truststore
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        trustStore.load(Files.newInputStream(Paths.get(TRUST_STORE_FILE)), TRUST_STORE_PASSWORD.toCharArray());
+        X509Certificate certificateRBAC = (X509Certificate) trustStore.getCertificate(TRUST_STORE_ALIAS_RBAC);
+        PublicKey publicKeyRBAC = certificateRBAC.getPublicKey();
+
+        // Verify authenticity and integrity of the response
+        if (!Security.verifySignature(publicKeyRBAC, signatureRBAC.toByteArray(), ticketBytes.toByteArray())) {
+            throw new InvalidSignatureException();
+        }
+
+        // Validate ticket information with the department request
+        if (!ticket.getUsername().equals(request.getUsername())) {
+            throw new InvalidTicketUsernameException(ticket.getUsername(), request.getUsername());
+        }
+        if (!ticket.getRole().equals(request.getRole())) {
+            throw new InvalidTicketRoleException(ticket.getRole().name(), request.getRole().name());
+        }
+        if (!ticket.getCompartment().equals(request.getCompartment())) {
+            throw new InvalidTicketCompartmentException(ticket.getCompartment().name(), request.getCompartment().name());
+        }
+
+        // Validate ticket timestamps
+        LocalDateTime now = LocalDateTime.now();
+
+        LocalDateTime requestIssuedAt = LocalDateTime.parse(ticket.getRequestIssuedAt(), dtf);
+        if (requestIssuedAt.isAfter(now)) {
+            throw new InvalidTicketIssuedTimeException(now, requestIssuedAt);
+        }
+
+        LocalDateTime requestValidUntil = LocalDateTime.parse(ticket.getRequestValidUntil(), dtf);
+        if (requestValidUntil.isBefore(now)) {
+            throw new InvalidTicketValidityTimeException(now, requestValidUntil);
+        }
+    }
+
+    public byte[] getCompartmentKey(GetCompartmentKeyRequest.RequestData data, ByteString signature,
+                                    GetCompartmentKeyRequest.Ticket ticket, ByteString signatureRBAC,
+                                    ByteString ticketBytes)
+            throws CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException,
+            InvalidKeyException, InvalidKeySpecException, SignatureException, InvalidSignatureException, BadPaddingException,
+            KeyStoreException, IOException, InvalidAlgorithmParameterException, InvalidCertificateChainException,
+            CertificateException, InvalidTicketUsernameException, InvalidTicketCompartmentException, InvalidTicketRoleException,
+            InvalidTicketIssuedTimeException, InvalidTicketValidityTimeException {
+
+        PublicKey departmentPublicKey = verifyDepartmentRequest(data, signature);
+        verifyRBACResponse(ticket, ticketBytes, signatureRBAC, data);
+
+        Compartment compartment = data.getCompartment();
+
+        if (compartment.equals(Compartment.PERSONAL_DATA)) {
             return Security.wrapKey(departmentPublicKey, personalInfoKey);
         }
-        else if (compartment.equals(Compartment.ENERGY_PANEL)) {
+        else if (compartment.equals(Compartment.ENERGY_DATA)) {
             return Security.wrapKey(departmentPublicKey, energyPanelKey);
         }
         else {

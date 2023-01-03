@@ -9,6 +9,7 @@
         <module name="backoffice" />
         <module name="security" />
         <module name="rbac" />
+        <module name="rbac-contract" />
         <module name="client" />
         <module name="admin" />
         <module name="webserver-contract" />
@@ -31,7 +32,7 @@
       <module name="employee" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="rbac" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
       <module name="server" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
-      <module name="webserver" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED --add-exports java.base/sun.security.tools.keytool=ALL-UNNAMED" />
+      <module name="webserver" options="--add-exports java.base/sun.security.x509=ALL-UNNAMED" />
     </option>
   </component>
 </project>

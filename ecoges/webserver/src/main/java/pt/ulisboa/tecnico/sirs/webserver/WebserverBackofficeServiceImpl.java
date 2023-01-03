@@ -3,9 +3,7 @@ package pt.ulisboa.tecnico.sirs.webserver;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.CompartmentKeyException;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.InvalidCertificateChainException;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.InvalidSignatureException;
+import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 
 import javax.crypto.BadPaddingException;
@@ -28,7 +26,8 @@ public class WebserverBackofficeServiceImpl extends WebserverBackofficeServiceGr
 	public void getCompartmentKey(GetCompartmentKeyRequest request, StreamObserver<GetCompartmentKeyResponse> responseObserver) {
 		GetCompartmentKeyResponse.Builder builder = GetCompartmentKeyResponse.newBuilder();
 		try {
-			byte[] key = server.getCompartmentKey(request.getData(), request.getSignature());
+			byte[] key = server.getCompartmentKey(request.getData(), request.getSignature(), request.getTicket(),
+					request.getSignatureRBAC(), request.getTicketBytes());
 
 			builder.setKey(ByteString.copyFrom(key));
 
@@ -40,7 +39,9 @@ public class WebserverBackofficeServiceImpl extends WebserverBackofficeServiceGr
 				 InvalidKeySpecException | CertificateException | SignatureException | BadPaddingException  |
 				 KeyStoreException | IOException | InvalidAlgorithmParameterException  e) {
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
-		} catch (InvalidSignatureException | InvalidCertificateChainException e) {
+		} catch (InvalidSignatureException | InvalidCertificateChainException | InvalidTicketUsernameException |
+				 InvalidTicketCompartmentException | InvalidTicketRoleException | InvalidTicketIssuedTimeException |
+				 InvalidTicketValidityTimeException e) {
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}
