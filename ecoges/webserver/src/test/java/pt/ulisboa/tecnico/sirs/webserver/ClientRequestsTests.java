@@ -41,16 +41,15 @@ public class ClientRequestsTests {
     private static SecretKey energyPanelKey;
 
     // Client credentials
-
-    private static String email = "junit2-clientemail";
-    private static String password = "junit2!StrongPassword";
-    private static String token = "";
+    private static final String email = "junit2-clientemail";
+    private static final String password = "junit2!StrongPassword";
+    private static final String token = "";
 
     @BeforeClass
     public static void setup() throws ClassNotFoundException, SQLException, UnrecoverableKeyException, CertificateException, KeyStoreException, NoSuchAlgorithmException, IOException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, ClientAlreadyExistsException, InvalidKeyException, InvalidAlgorithmParameterException, BadPaddingException {
         loadKeysCertificates();
         setupDatabase();
-        webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey);
+        webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey, keyPair);
         webserver.register("name", email, password, "new address", "iban", PlanType.FLAT_RATE.name());
     }
 

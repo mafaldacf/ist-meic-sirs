@@ -5,10 +5,7 @@ import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
 import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
+import javax.crypto.*;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,16 +37,13 @@ public class Webserver {
     // Compartments
     private final SecretKey personalInfoKey;
     private final SecretKey energyPanelKey;
+    private final KeyPair keyPair;
 
-    public Webserver(SecretKey personalInfoKey, SecretKey energyPanelKey) {
-        this.personalInfoKey = personalInfoKey;
-        this.energyPanelKey = energyPanelKey;
-    }
-
-    public Webserver(Connection dbConnection, SecretKey personalInfoKey, SecretKey energyPanelKey) {
+    public Webserver(Connection dbConnection, SecretKey personalInfoKey, SecretKey energyPanelKey, KeyPair keyPair) {
         this.dbConnection = dbConnection;
         this.personalInfoKey = personalInfoKey;
         this.energyPanelKey = energyPanelKey;
+        this.keyPair = keyPair;
     }
 
     /*
@@ -131,34 +125,294 @@ public class Webserver {
         }
     }
 
+    public void ackCompartmentKey(String clientEmail, Compartment compartment) throws InvalidAlgorithmParameterException, SQLException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+        Statement st;
+
+        // start transaction due to the long set of operations and the existence of concurrent accesses to the client data
+        st = dbConnection.createStatement();
+        st.execute(START_TRANSACTION);
+        try {
+            if (compartment.equals(Compartment.PERSONAL_DATA)) {
+                updatePersonalDataWithNewKey(personalInfoKey, clientEmail);
+            } else {
+                updateEnergyDataWithNewKey(energyPanelKey, clientEmail);
+            }
+        } catch (Exception e) {
+            st = dbConnection.createStatement();
+            System.out.println("[-] Aborting 'ack compartment key' transaction for " + compartment.name() + " of " + clientEmail);
+            st.execute(ABORT_TRANSACTION);
+            throw e;
+        }
+
+        st = dbConnection.createStatement();
+        System.out.println("[+] Committing 'ack compartment key' transaction for " + compartment.name() + " of " + clientEmail);
+        st.execute(COMMIT_TRANSACTION);
+    }
+
     public byte[] getCompartmentKey(GetCompartmentKeyRequest.RequestData data, ByteString signature,
                                     GetCompartmentKeyRequest.Ticket ticket, ByteString signatureRBAC,
-                                    ByteString ticketBytes)
+                                    ByteString ticketBytes, String clientEmail)
             throws CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException,
             InvalidKeyException, InvalidKeySpecException, SignatureException, InvalidSignatureException, BadPaddingException,
             KeyStoreException, IOException, InvalidAlgorithmParameterException, InvalidCertificateChainException,
             CertificateException, InvalidTicketUsernameException, InvalidTicketCompartmentException, InvalidTicketRoleException,
-            InvalidTicketIssuedTimeException, InvalidTicketValidityTimeException {
+            InvalidTicketIssuedTimeException, InvalidTicketValidityTimeException, SQLException {
+
+        Statement st;
 
         PublicKey departmentPublicKey = verifyDepartmentRequest(data, signature);
         verifyRBACResponse(ticket, ticketBytes, signatureRBAC, data);
 
-        Compartment compartment = data.getCompartment();
+        // Generate temporary key
+        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(256);
+        SecretKey temporaryKey = keyGen.generateKey();
 
-        if (compartment.equals(Compartment.PERSONAL_DATA)) {
-            return Security.wrapKey(departmentPublicKey, personalInfoKey);
+        // start transaction due to the long set of operations and the existence of concurrent accesses to the client data
+        st = dbConnection.createStatement();
+        st.execute(START_TRANSACTION);
+
+        try {
+            if (data.getCompartment().name().equals(Compartment.PERSONAL_DATA.name())) {
+                updatePersonalDataWithNewKey(temporaryKey, clientEmail);
+            } else if (data.getCompartment().name().equals(Compartment.ENERGY_DATA.name())) {
+                updateEnergyDataWithNewKey(temporaryKey, clientEmail);
+            }
+        } catch (Exception e) {
+            st = dbConnection.createStatement();
+            System.out.println("[-] Aborting 'get compartment key' transaction for " + data.getCompartment().name() + " of " + clientEmail);
+            st.execute(ABORT_TRANSACTION);
+            throw e;
         }
-        else if (compartment.equals(Compartment.ENERGY_DATA)) {
-            return Security.wrapKey(departmentPublicKey, energyPanelKey);
+
+        st = dbConnection.createStatement();
+        System.out.println("[+] Committing 'get compartment key' transaction for " + data.getCompartment().name() + " of " + clientEmail);
+        st.execute(COMMIT_TRANSACTION);
+
+        return Security.wrapKey(departmentPublicKey, temporaryKey);
+    }
+
+    public SecretKey computeOldKey(SecretKey masterKey, String query, String clientEmail) throws SQLException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+        PreparedStatement st;
+        ResultSet rs;
+        SecretKey oldKey = null;
+
+        st = dbConnection.prepareStatement(query);
+        st.setString(1, clientEmail);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            byte[] lastTemporaryKey = rs.getBytes(1);
+
+            if(lastTemporaryKey == null) {
+                oldKey = masterKey;
+            }
+            else { // recover old temporary key if backoffice disconnected and did not send an acknowledgment message
+                oldKey = Security.unwrapKey(keyPair.getPrivate(), lastTemporaryKey);
+            }
         }
         else {
-            throw new CompartmentKeyException();
+            rs.close();
         }
+        rs.close();
+        return oldKey;
+    }
+
+    public void saveNewKey(SecretKey masterKey, SecretKey newKey, String query, String clientEmail) throws SQLException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException {
+        PreparedStatement st;
+        st = dbConnection.prepareStatement(query);
+        if (newKey.equals(masterKey)) {
+            st.setBytes(1, null); // set temporary key value to null
+        }
+        else {
+            st.setBytes(1, Security.wrapKey(keyPair.getPublic(), newKey));
+        }
+        st.setString(2, clientEmail);
+        st.execute();
+    }
+
+    public void updatePersonalDataWithNewKey(SecretKey newKey, String clientEmail) throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+        SecretKey oldKey = computeOldKey(personalInfoKey, READ_CLIENT_LAST_TEMPORARY_PERSONAL_KEY, clientEmail);
+        if (oldKey == null)  return;
+        updateClientPersonalData(clientEmail, oldKey, newKey);
+
+        saveNewKey(personalInfoKey, newKey, UPDATE_CLIENT_TEMPORARY_PERSONAL_KEY, clientEmail);
+    }
+
+    public void updateClientPersonalData(String clientEmail, SecretKey oldKey, SecretKey newKey)
+            throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException,
+            NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+
+        PreparedStatement st;
+        ResultSet rs;
+        String address, iban;
+        byte[] oldIv, newIv;
+
+        // decrypt data with old key
+        st = dbConnection.prepareStatement(READ_CLIENT_IV_AND_ENCRYPTED_PERSONAL_DATA);
+        st.setString(1, clientEmail);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            oldIv = rs.getBytes(1);
+            address = new String(Security.decryptData(rs.getBytes(2), oldKey, oldIv));
+            iban = new String(Security.decryptData(rs.getBytes(3), oldKey, oldIv));
+        }
+        else {
+            rs.close();
+            return; // must not happen
+        }
+        rs.close();
+
+        // encrypt data with new key
+        newIv = Security.generateRandom();
+        st = dbConnection.prepareStatement(UPDATE_CLIENT_IV_AND_ENCRYPTED_PERSONAL_INFO);
+        st.setBytes(1, newIv);
+        st.setBytes(2, Security.encryptData(address, newKey, newIv));
+        st.setBytes(3, Security.encryptData(iban, newKey, newIv));
+        st.setString(4, clientEmail);
+        st.execute();
+
+    }
+
+    public void updateEnergyDataWithNewKey(SecretKey newKey, String clientEmail) throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+        SecretKey oldKey = computeOldKey(energyPanelKey, READ_CLIENT_LAST_TEMPORARY_ENERGY_KEY, clientEmail);
+        if (oldKey == null) return;
+
+        int clientId = updateClientGeneralEnergy(clientEmail, oldKey, newKey);
+        updateClientAppliancesEnergy(clientId, oldKey, newKey);
+        updateClientSolarPanelsEnergy(clientId, oldKey, newKey);
+
+        saveNewKey(energyPanelKey, newKey, UPDATE_CLIENT_TEMPORARY_ENERGY_KEY, clientEmail);
+    }
+
+    public int updateClientGeneralEnergy(String clientEmail, SecretKey oldKey, SecretKey newKey)
+            throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException,
+            NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+
+
+        PreparedStatement st;
+        ResultSet rs;
+        float energyConsumed, energyConsumedDaytime, energyConsumedNight, energyProduced;
+        byte[] oldIv, newIv;
+        int clientId = -1;
+
+        // decrypt data with old key
+        st = dbConnection.prepareStatement(READ_CLIENT_IV_AND_ENCRYPTED_ENERGY_DATA);
+        st.setString(1, clientEmail);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            oldIv = rs.getBytes(1);
+            clientId = rs.getInt(2);
+            byte[] energyConsumedBytes = Security.decryptData(rs.getBytes(3), oldKey, oldIv);
+            byte[] energyConsumedDaytimeBytes = Security.decryptData(rs.getBytes(4), oldKey, oldIv);
+            byte[] energyConsumedNightBytes = Security.decryptData(rs.getBytes(5), oldKey, oldIv);
+            byte[] energyProducedBytes = Security.decryptData(rs.getBytes(6), oldKey, oldIv);
+
+            energyConsumed = Float.parseFloat(new String(energyConsumedBytes));
+            energyConsumedDaytime = Float.parseFloat(new String(energyConsumedDaytimeBytes));
+            energyConsumedNight = Float.parseFloat(new String(energyConsumedNightBytes));
+            energyProduced = Float.parseFloat(new String(energyProducedBytes));
+        }
+        else {
+            rs.close();
+            return clientId;
+        }
+
+        rs.close();
+
+        // encrypt data with new key
+        newIv = Security.generateRandom();
+        st = dbConnection.prepareStatement(UPDATE_CLIENT_IV_AND_ENCRYPTED_ENERGY_PANEL);
+        st.setBytes(1, newIv);
+        st.setBytes(2, Security.encryptData(String.valueOf(energyConsumed), newKey, newIv));
+        st.setBytes(3, Security.encryptData(String.valueOf(energyConsumedDaytime), newKey, newIv));
+        st.setBytes(4, Security.encryptData(String.valueOf(energyConsumedNight), newKey, newIv));
+        st.setBytes(5, Security.encryptData(String.valueOf(energyProduced), newKey, newIv));
+        st.setString(6, clientEmail);
+        st.execute();
+
+        return clientId;
+    }
+
+    public void updateClientAppliancesEnergy(int clientId, SecretKey oldKey, SecretKey newKey)
+            throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException,
+            NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+
+        PreparedStatement st, st2;
+        ResultSet rs;
+        float energyConsumed, energyConsumedDaytime, energyConsumedNight;
+        byte[] oldIv, newIv;
+        int id;
+
+        // decrypt data with old key
+        st = dbConnection.prepareStatement(READ_CLIENT_IV_AND_ENCRYPTED_APPLIANCES_ENERGY);
+        st.setInt(1, clientId);
+        rs = st.executeQuery();
+
+        while (rs.next()) {
+            oldIv = rs.getBytes(1);
+            id = rs.getInt(2);
+            byte[] energyConsumedBytes = Security.decryptData(rs.getBytes(3), oldKey, oldIv);
+            byte[] energyConsumedDaytimeBytes = Security.decryptData(rs.getBytes(4), oldKey, oldIv);
+            byte[] energyConsumedNightBytes = Security.decryptData(rs.getBytes(5), oldKey, oldIv);
+
+            energyConsumed = Float.parseFloat(new String(energyConsumedBytes));
+            energyConsumedDaytime = Float.parseFloat(new String(energyConsumedDaytimeBytes));
+            energyConsumedNight = Float.parseFloat(new String(energyConsumedNightBytes));
+
+            // encrypt data with new key
+            newIv = Security.generateRandom();
+            st2 = dbConnection.prepareStatement(UPDATE_CLIENT_IV_AND_APPLIANCE_ENERGY);
+            st2.setBytes(1, newIv);
+            st2.setBytes(2, Security.encryptData(String.valueOf(energyConsumed), newKey, newIv));
+            st2.setBytes(3, Security.encryptData(String.valueOf(energyConsumedDaytime), newKey, newIv));
+            st2.setBytes(4, Security.encryptData(String.valueOf(energyConsumedNight), newKey, newIv));
+            st2.setInt(5, id);
+            st2.execute();
+        }
+
+        rs.close();
+    }
+
+    public void updateClientSolarPanelsEnergy(int clientId, SecretKey oldKey, SecretKey newKey)
+            throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException,
+            NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+
+        PreparedStatement st, st2;
+        ResultSet rs;
+        float energyProduced;
+        byte[] oldIv, newIv;
+        int id;
+
+        // decrypt data with old key
+        st = dbConnection.prepareStatement(READ_CLIENT_IV_AND_ENCRYPTED_SOLAR_PANELS_ENERGY);
+        st.setInt(1, clientId);
+        rs = st.executeQuery();
+
+        while (rs.next()) {
+            oldIv = rs.getBytes(1);
+            id = rs.getInt(2);
+            byte[] energyProducedBytes = Security.decryptData(rs.getBytes(3), oldKey, oldIv);
+
+            energyProduced = Float.parseFloat(new String(energyProducedBytes));
+
+            // encrypt data with new key
+            newIv = Security.generateRandom();
+            st2 = dbConnection.prepareStatement(UPDATE_CLIENT_IV_AND_SOLAR_PANEL_ENERGY);
+            st2.setBytes(1, newIv);
+            st2.setBytes(2, Security.encryptData(String.valueOf(energyProduced), newKey, newIv));
+            st2.setInt(3, id);
+            st2.execute();
+        }
+
+        rs.close();
     }
 
     /*
     ------------------------------------------------------
-    ---------------- CLIENT SESSION TOKEN ----------------
+    -------------- CLIENT DATA OBFUSCATION ---------------
     ------------------------------------------------------
      */
 
@@ -264,33 +518,35 @@ public class Webserver {
         byte[] salt = Security.generateRandom();
         String hashedPassword = Security.hashWithSalt(password, salt);
 
-        byte[] iv = Security.generateRandom();
+        byte[] ivPersonalData = Security.generateRandom();
+        byte[] ivEnergyData = Security.generateRandom();
 
         st = dbConnection.prepareStatement(CREATE_CLIENT);
         st.setString(1, name);
         st.setString(2, email);
         st.setString(3, hashedPassword);
         st.setBytes(4, salt);
-        st.setBytes(5, iv);
-        st.setString(6, plan);
+        st.setBytes(5, ivPersonalData);
+        st.setBytes(6, ivEnergyData);
+        st.setString(7, plan);
 
-        st.setBytes(7, Security.encryptData(address, personalInfoKey, iv));
-        st.setBytes(8, Security.encryptData(iban, personalInfoKey, iv));
+        st.setBytes(8, Security.encryptData(address, personalInfoKey, ivPersonalData));
+        st.setBytes(9, Security.encryptData(iban, personalInfoKey, ivPersonalData));
 
-        st.setBytes(9, Security.encryptData(Float.toString(0), energyPanelKey, iv));
-        st.setBytes(10, Security.encryptData(Float.toString(0), energyPanelKey, iv));
-        st.setBytes(11, Security.encryptData(Float.toString(0), energyPanelKey, iv));
-        st.setBytes(12, Security.encryptData(Float.toString(0), energyPanelKey, iv));
+        st.setBytes(10, Security.encryptData(Float.toString(0), energyPanelKey, ivEnergyData));
+        st.setBytes(11, Security.encryptData(Float.toString(0), energyPanelKey, ivEnergyData));
+        st.setBytes(12, Security.encryptData(Float.toString(0), energyPanelKey, ivEnergyData));
+        st.setBytes(13, Security.encryptData(Float.toString(0), energyPanelKey, ivEnergyData));
 
         // obfuscated info
-        st.setString(13, obfuscate(address));
-        st.setString(14, obfuscate(iban));
+        st.setString(14, obfuscate(address));
+        st.setString(15, obfuscate(iban));
 
         float noval = 0;
-        st.setString(15, obfuscate(Float.toString(noval)));
         st.setString(16, obfuscate(Float.toString(noval)));
         st.setString(17, obfuscate(Float.toString(noval)));
         st.setString(18, obfuscate(Float.toString(noval)));
+        st.setString(19, obfuscate(Float.toString(noval)));
 
         st.executeUpdate();
         st.close();
@@ -451,8 +707,6 @@ public class Webserver {
 
         validateSession(clientEmail, hashedToken);
 
-        byte[] iv = getIv(clientEmail);
-
         // get personal info
         st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
         st.setString(1, clientEmail);
@@ -500,7 +754,7 @@ public class Webserver {
         appliances = getAppliances(client_id);
         solarPanels = getSolarPanels(client_id);
 
-        byte[] iv = getIv(email);
+        byte[] iv = getIv(email, Compartment.ENERGY_DATA);
 
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
         st.setString(1, email);
@@ -593,7 +847,7 @@ public class Webserver {
 
         validateSession(email, hashedToken);
 
-        byte[] iv = getIv(email);
+        byte[] iv = getIv(email, Compartment.PERSONAL_DATA);
 
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ADDRESS);
         st.setBytes(1, Security.encryptData(address, personalInfoKey, iv));
@@ -609,8 +863,6 @@ public class Webserver {
 
         validateSession(email, hashedToken);
 
-        byte[] iv = getIv(email);
-
         PreparedStatement st = dbConnection.prepareStatement(UPDATE_CLIENT_PLAN);
         st.setString(1, plan);
         st.setString(2, email);
@@ -624,12 +876,18 @@ public class Webserver {
     ------------------------------------------------------
      */
 
-    public byte[] getIv(String email) throws SQLException, ClientDoesNotExistException {
+    public byte[] getIv(String email, Compartment compartment) throws SQLException, ClientDoesNotExistException {
         PreparedStatement st;
         ResultSet rs;
         byte[] iv;
 
-        st = dbConnection.prepareStatement(READ_CLIENT_IV);
+        if (compartment.equals(Compartment.PERSONAL_DATA)) {
+            st = dbConnection.prepareStatement(READ_CLIENT_IV_PERSONAL_DATA);
+        }
+        else {
+            st = dbConnection.prepareStatement(READ_CLIENT_IV_ENERGY_DATA);
+        }
+
         st.setString(1, email);
         rs = st.executeQuery();
 
@@ -674,7 +932,7 @@ public class Webserver {
         ResultSet rs;
         float currEnergyConsumed, currEnergyConsumedDaytime, currEnergyConsumedNight;
 
-        byte[] iv = getIv(email);
+        byte[] iv = getIv(email, Compartment.ENERGY_DATA);
 
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION);
@@ -720,7 +978,7 @@ public class Webserver {
         ResultSet rs;
         float currEnergyProduced;
 
-        byte[] iv = getIv(email);
+        byte[] iv = getIv(email, Compartment.ENERGY_DATA);
 
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PRODUCTION);

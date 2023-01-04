@@ -19,7 +19,8 @@ public class DatabaseQueries {
 
     public static final String READ_CLIENT_ID = "SELECT id FROM client WHERE email = ?";
     public static final String READ_CLIENT_ENERGY_PANEL = "SELECT energyConsumed, energyConsumedDaytime, energyConsumedNight, energyProduced FROM client WHERE email = ? ";
-    public static final String READ_CLIENT_IV = "SELECT iv FROM client WHERE email = ?";
+    public static final String READ_CLIENT_IV_PERSONAL_DATA = "SELECT iv_personal_data FROM client WHERE email = ?";
+    public static final String READ_CLIENT_IV_ENERGY_DATA = "SELECT iv_energy_data FROM client WHERE email = ?";
 
     public static final String READ_ADMIN_TOKEN = "SELECT token FROM admin WHERE username = ?";
 

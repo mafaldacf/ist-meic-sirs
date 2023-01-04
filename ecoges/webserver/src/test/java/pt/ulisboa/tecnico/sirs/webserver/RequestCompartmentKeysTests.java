@@ -7,13 +7,10 @@ import pt.ulisboa.tecnico.sirs.rbac.exceptions.InvalidRoleException;
 import pt.ulisboa.tecnico.sirs.rbac.exceptions.PermissionDeniedException;
 import pt.ulisboa.tecnico.sirs.rbac.grpc.PermissionType;
 import pt.ulisboa.tecnico.sirs.rbac.grpc.Role;
-import pt.ulisboa.tecnico.sirs.rbac.grpc.ValidatePermissionRequest;
 import pt.ulisboa.tecnico.sirs.rbac.grpc.ValidatePermissionResponse;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.Compartment;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.GetCompartmentKeyRequest;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.RoleTypes;
+import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
 
 import javax.crypto.*;
 import java.security.*;
@@ -31,12 +28,21 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.sql.*;
+
+import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.*;
+import static pt.ulisboa.tecnico.sirs.webserver.DatabaseQueries.CREATE_COMPARTMENT_KEYS_TABLE;
 
 public class RequestCompartmentKeysTests {
 
     private static Webserver webserver;
     private static Rbac rbac;
 
+    private static KeyPair keyPair;
+
+    private static final String KEY_STORE_FILE = "src/main/resources/webserver.keystore";
+    private static final String KEY_STORE_PASSWORD = "mypasswebserver";
+    private static final String KEY_STORE_ALIAS_WEBSERVER = "webserver";
     private static X509Certificate testCertificate;
     private static PrivateKey testPrivateKey;
 
@@ -48,26 +54,42 @@ public class RequestCompartmentKeysTests {
     private static SecretKey personalInfoKey;
 
     private static SecretKey energyPanelKey;
-    private static final String KEY_STORE_FILE = "./../backoffice/src/main/resources/backoffice.keystore";
-    private static final String KEY_STORE_PASSWORD = "mypassbackoffice";
-    private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
-    private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
+    private static final String BACKOFFICE_KEY_STORE_FILE = "./../backoffice/src/main/resources/backoffice.keystore";
+    private static final String BACKOFFICE_KEY_STORE_PASSWORD = "mypassbackoffice";
+    private static final String BACKOFFICE_KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
+    private static final String BACKOFFICE_KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
+
+    // Database
+    private static final String DBURL = "jdbc:mysql://localhost:3306/clientdb";
+    private static final String DATABASE_USER = "ecoges";
+    private static final String DATABASE_PASSWORD = "admin";
+    private static Connection dbConnection = null;
+    private static final String DATABASE_DRIVER = "com.mysql.cj.jdbc.Driver";
 
     // Testing purposes
-    private static final String TEST_KEY_STORE_FILE = "src/test/resources/webserver-tests.keystore";
-    private static final String TEST_KEY_STORE_PASSWORD = "mypasswebserver-tests";
-    private static final String TEST_KEY_STORE_ALIAS_TEST = "tests";
+    private static final String WEBSERVER_TEST_KEY_STORE_FILE = "src/test/resources/webserver-tests.keystore";
+    private static final String WEBSERVER_TEST_KEY_STORE_PASSWORD = "mypasswebserver-tests";
+    private static final String WEBSERVER_TEST_KEY_STORE_ALIAS_TEST = "tests";
+
+    // Client credentials
+    private static final String email = "junit2-clientemail";
+    private static final String password = "junit2!StrongPassword";
+    private static final String address = "address";
+    private static final String iban = "iban";
 
     @BeforeClass
-    public static void setup() throws CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException, IOException, KeyStoreException {
+    public static void setup() throws CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException, IOException, KeyStoreException, SQLException, ClassNotFoundException, InvalidAlgorithmParameterException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, ClientAlreadyExistsException, BadPaddingException, InvalidKeyException {
+        loadKeysCertificates();
         loadTestCertificate();
         generateCompartmentKeys();
+        setupDatabase();
 
-        webserver = new Webserver(personalInfoKey, energyPanelKey);
+        webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey, keyPair);
+        webserver.register("name", email, password, "address", "iban", PlanType.FLAT_RATE.name());
         rbac = new Rbac("../rbac/src/main/resources/rbac.keystore");
     }
     @Test
-    public void requestCompartmentKeyAMTest() throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, CertificateException, KeyStoreException, IOException, UnrecoverableKeyException, InvalidSignatureException, InvalidAlgorithmParameterException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidCertificateChainException, InvalidKeySpecException, BadPaddingException, PermissionDeniedException, InvalidRoleException, InvalidTicketUsernameException, InvalidTicketCompartmentException, InvalidTicketIssuedTimeException, InvalidTicketRoleException, InvalidTicketValidityTimeException {
+    public void requestCompartmentKeyAMTest() throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, CertificateException, KeyStoreException, IOException, UnrecoverableKeyException, InvalidSignatureException, InvalidAlgorithmParameterException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidCertificateChainException, InvalidKeySpecException, BadPaddingException, PermissionDeniedException, InvalidRoleException, InvalidTicketUsernameException, InvalidTicketCompartmentException, InvalidTicketIssuedTimeException, InvalidTicketRoleException, InvalidTicketValidityTimeException, SQLException, ClientDoesNotExistException {
         loadAMDepartmentCertificate();
 
         // request permission to RBAC
@@ -84,13 +106,17 @@ public class RequestCompartmentKeysTests {
         ByteString signature = Security.signMessage(AMPrivateKey, data.toByteArray());
 
         byte[] wrappedKey = webserver.getCompartmentKey(data, signature, convertTicket(response.getData()),
-                response.getSignature(), response.getData().toByteString());
+                response.getSignature(), response.getData().toByteString(), email);
 
         SecretKey key = Security.unwrapKey(AMPrivateKey, wrappedKey);
-        Assert.assertEquals(personalInfoKey, key);
+        Assert.assertNotNull(key);
+
+        PersonalInfo personalInfo = getPersonalInfo(email, key);
+        Assert.assertEquals(address, personalInfo.getAddress());
+        Assert.assertEquals(iban, personalInfo.getIBAN());
     }
     @Test
-    public void requestCompartmentKeyEMTest() throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, CertificateException, KeyStoreException, IOException, UnrecoverableKeyException, InvalidSignatureException, InvalidAlgorithmParameterException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidCertificateChainException, InvalidKeySpecException, BadPaddingException, PermissionDeniedException, InvalidRoleException, InvalidTicketUsernameException, InvalidTicketCompartmentException, InvalidTicketIssuedTimeException, InvalidTicketRoleException, InvalidTicketValidityTimeException {
+    public void requestCompartmentKeyEMTest() throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, CertificateException, KeyStoreException, IOException, UnrecoverableKeyException, InvalidSignatureException, InvalidAlgorithmParameterException, CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, InvalidCertificateChainException, InvalidKeySpecException, BadPaddingException, PermissionDeniedException, InvalidRoleException, InvalidTicketUsernameException, InvalidTicketCompartmentException, InvalidTicketIssuedTimeException, InvalidTicketRoleException, InvalidTicketValidityTimeException, SQLException {
         loadEMDepartmentCertificate();
 
         // request permission to RBAC
@@ -107,10 +133,10 @@ public class RequestCompartmentKeysTests {
         ByteString signature = Security.signMessage(EMPrivateKey, data.toByteArray());
 
         byte[] wrappedKey = webserver.getCompartmentKey(data, signature, convertTicket(response.getData()),
-                response.getSignature(), response.getData().toByteString());
+                response.getSignature(), response.getData().toByteString(), email);
 
         SecretKey key = Security.unwrapKey(EMPrivateKey, wrappedKey);
-        Assert.assertEquals(energyPanelKey, key);
+        Assert.assertNotNull(key);
     }
 
     @Test
@@ -123,7 +149,7 @@ public class RequestCompartmentKeysTests {
         ByteString signature = Security.signMessage(testPrivateKey, data.toByteArray());
 
         Assert.assertThrows(InvalidCertificateChainException.class, () ->
-            webserver.getCompartmentKey(data, signature, null, null, null));
+            webserver.getCompartmentKey(data, signature, null, null, null, null));
     }
 
     @Test
@@ -145,23 +171,50 @@ public class RequestCompartmentKeysTests {
         ByteString signature = Security.signMessage(privateKey, data.toByteArray());
 
         Assert.assertThrows(InvalidSignatureException.class, () ->
-            webserver.getCompartmentKey(data, signature, null, null, null));
+            webserver.getCompartmentKey(data, signature, null, null, null, null));
+    }
+
+    public PersonalInfo getPersonalInfo(String clientEmail, SecretKey temporaryKey) throws SQLException, ClientDoesNotExistException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+        PersonalInfo personalInfo;
+        PreparedStatement st;
+        ResultSet rs;
+
+        // get personal info
+        st = dbConnection.prepareStatement(READ_CLIENT_IV_AND_ENCRYPTED_PERSONAL_DATA);
+        st.setString(1, clientEmail);
+        rs = st.executeQuery();
+
+        if (rs.next()) {
+            byte[] iv = rs.getBytes(1);
+            String address = new String(Security.decryptData(rs.getBytes(2), temporaryKey, iv));
+            String iban = new String(Security.decryptData(rs.getBytes(3), temporaryKey, iv));
+
+            personalInfo = PersonalInfo.newBuilder()
+                    .setAddress(address)
+                    .setIBAN(iban)
+                    .build();
+        } else {
+            st.close();
+            throw new ClientDoesNotExistException(clientEmail);
+        }
+
+        return personalInfo;
     }
 
     public static void loadAMDepartmentCertificate() throws IOException, KeyStoreException, UnrecoverableKeyException, NoSuchAlgorithmException, CertificateException {
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
+        keyStore.load(Files.newInputStream(Paths.get(BACKOFFICE_KEY_STORE_FILE)), BACKOFFICE_KEY_STORE_PASSWORD.toCharArray());
 
-        AMPrivateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
-        AMCertificate = (X509Certificate) keyStore.getCertificate(KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT);
+        AMPrivateKey = (PrivateKey) keyStore.getKey(BACKOFFICE_KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT, BACKOFFICE_KEY_STORE_PASSWORD.toCharArray());
+        AMCertificate = (X509Certificate) keyStore.getCertificate(BACKOFFICE_KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT);
     }
 
     public static void loadEMDepartmentCertificate() throws IOException, KeyStoreException, UnrecoverableKeyException, NoSuchAlgorithmException, CertificateException {
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
+        keyStore.load(Files.newInputStream(Paths.get(BACKOFFICE_KEY_STORE_FILE)), BACKOFFICE_KEY_STORE_PASSWORD.toCharArray());
 
-        EMPrivateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_ENERGY_MANAGEMENT, KEY_STORE_PASSWORD.toCharArray());
-        EMCertificate = (X509Certificate) keyStore.getCertificate(KEY_STORE_ALIAS_ENERGY_MANAGEMENT);
+        EMPrivateKey = (PrivateKey) keyStore.getKey(BACKOFFICE_KEY_STORE_ALIAS_ENERGY_MANAGEMENT, BACKOFFICE_KEY_STORE_PASSWORD.toCharArray());
+        EMCertificate = (X509Certificate) keyStore.getCertificate(BACKOFFICE_KEY_STORE_ALIAS_ENERGY_MANAGEMENT);
     }
 
     private static void generateCompartmentKeys() throws NoSuchAlgorithmException  {
@@ -178,10 +231,10 @@ public class RequestCompartmentKeysTests {
 
     public static void loadTestCertificate() throws NoSuchAlgorithmException, CertificateException, IOException, KeyStoreException, UnrecoverableKeyException {
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        keyStore.load(Files.newInputStream(Paths.get(TEST_KEY_STORE_FILE)), TEST_KEY_STORE_PASSWORD.toCharArray());
+        keyStore.load(Files.newInputStream(Paths.get(WEBSERVER_TEST_KEY_STORE_FILE)), WEBSERVER_TEST_KEY_STORE_PASSWORD.toCharArray());
 
-        testPrivateKey = (PrivateKey) keyStore.getKey(TEST_KEY_STORE_ALIAS_TEST, TEST_KEY_STORE_PASSWORD.toCharArray());
-        testCertificate = (X509Certificate) keyStore.getCertificate(TEST_KEY_STORE_ALIAS_TEST);
+        testPrivateKey = (PrivateKey) keyStore.getKey(WEBSERVER_TEST_KEY_STORE_ALIAS_TEST, WEBSERVER_TEST_KEY_STORE_PASSWORD.toCharArray());
+        testCertificate = (X509Certificate) keyStore.getCertificate(WEBSERVER_TEST_KEY_STORE_ALIAS_TEST);
     }
 
     public GetCompartmentKeyRequest.Ticket convertTicket(ValidatePermissionResponse.Ticket ticket) {
@@ -192,5 +245,57 @@ public class RequestCompartmentKeysTests {
                 .setRequestIssuedAt(ticket.getRequestIssuedAt())
                 .setRequestValidUntil(ticket.getRequestValidUntil())
                 .build();
+    }
+
+    private static void loadKeysCertificates() throws KeyStoreException, NoSuchAlgorithmException, CertificateException,
+            IOException, UnrecoverableKeyException {
+
+        // Key Store
+        KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        keyStore.load(Files.newInputStream(Paths.get(KEY_STORE_FILE)), KEY_STORE_PASSWORD.toCharArray());
+
+        PrivateKey privateKey = (PrivateKey) keyStore.getKey(KEY_STORE_ALIAS_WEBSERVER, KEY_STORE_PASSWORD.toCharArray());
+        PublicKey publicKey = keyStore.getCertificate(KEY_STORE_ALIAS_WEBSERVER).getPublicKey();
+        keyPair = new KeyPair(publicKey, privateKey);
+
+        System.out.println("Successfully loaded key pairs and certificate from Java Keystore!");
+    }
+
+    public static void setupDatabase() throws ClassNotFoundException, SQLException {
+        Class.forName(DATABASE_DRIVER);
+        dbConnection = DriverManager.getConnection(DBURL, DATABASE_USER, DATABASE_PASSWORD);
+
+        Statement statement;
+
+        try {
+            boolean reachable = dbConnection.isValid(25);
+            if (!reachable) {
+                throw new SQLException("Unreachable database connection.");
+            }
+
+            statement = dbConnection.createStatement();
+            statement.execute(DROP_INVOICE_TABLE);
+            statement.execute(DROP_SOLAR_PANEL_TABLE);
+            statement.execute(DROP_APPLIANCE_TABLE);
+            statement.execute(DROP_CLIENT_TABLE);
+            statement.execute(DROP_COMPARTMENT_KEYS_TABLE);
+
+            statement = dbConnection.createStatement();
+            statement.execute(CREATE_CLIENT_TABLE);
+            statement.execute(CREATE_APPLIANCE_TABLE);
+            statement.execute(CREATE_SOLAR_PANEL_TABLE);
+            statement.execute(CREATE_INVOICE_TABLE);
+            statement.execute(CREATE_COMPARTMENT_KEYS_TABLE);
+
+            generateCompartmentKeys();
+
+            System.out.println("Database is ready!");
+        } catch (SQLException e) {
+            System.out.println("Could not set up database: "+ e.getMessage());
+            System.exit(1);
+        } catch (NoSuchAlgorithmException e) {
+            System.out.println("Could not generate compartment keys: "+ e.getMessage());
+            System.exit(1);
+        }
     }
 }

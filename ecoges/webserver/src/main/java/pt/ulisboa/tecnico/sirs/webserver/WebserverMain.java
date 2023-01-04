@@ -113,7 +113,7 @@ public class WebserverMain {
 			SslContext sslContext = GrpcSslContexts.configure(SslContextBuilder.forServer(keyPair.getPrivate(), certificate).trustManager(CACertificate)).build();
 
 			// Service
-			Webserver webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey);
+			Webserver webserver = new Webserver(dbConnection, personalInfoKey, energyPanelKey, keyPair);
 			Server server = forPort(serverPort).sslContext(sslContext)
 					.addService(new WebserverServiceImpl(webserver))
 					.addService(new WebserverBackofficeServiceImpl(webserver))
@@ -247,27 +247,6 @@ public class WebserverMain {
 			}
 		}
 
-		public byte[] getIv(String email) throws SQLException, ClientDoesNotExistException {
-			PreparedStatement st;
-			ResultSet rs;
-			byte[] iv;
-
-			st = dbConnection.prepareStatement(READ_CLIENT_IV);
-			st.setString(1, email);
-			rs = st.executeQuery();
-
-			if (rs.next()) {
-				iv = rs.getBytes(1);
-			}
-			else {
-				st.close();
-				throw new ClientDoesNotExistException(email);
-			}
-
-			st.close();
-			return iv;
-		}
-
 		public void addInvoice(int client_id, float energyConsumed, float energyConsumedDaytime, float energyConsumedNight, String plan) throws NoSuchAlgorithmException, SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, BadPaddingException, InvalidKeyException {
 			PreparedStatement st;
 			float paymentAmount;
@@ -300,8 +279,10 @@ public class WebserverMain {
 		}
 		@Override
 		public void run() {
+			System.out.println("\nGenerating new invoices for " + months.get(currMonth) + " " + currYear);
 			PreparedStatement st;
 			ResultSet rs;
+			SecretKey currentKey;
 			try {
 				st = dbConnection.prepareStatement(READ_ALL_CLIENTS_ID_ENERGY_CONSUMPTION_PLAN);
 				rs = st.executeQuery();
@@ -310,10 +291,18 @@ public class WebserverMain {
 					int client_id = rs.getInt(1);
 					String plan = rs.getString(2);
 					byte[] iv = rs.getBytes(3);
+					byte[] lastTemporaryKey = rs.getBytes(4);
 
-					byte[] energyConsumedBytes = Security.decryptData(rs.getBytes(4), energyPanelKey, iv);
-					byte[] energyConsumedDaytimeBytes = Security.decryptData(rs.getBytes(5), energyPanelKey, iv);
-					byte[] energyConsumedNightBytes = Security.decryptData(rs.getBytes(6), energyPanelKey, iv);
+					if(lastTemporaryKey == null) {
+						currentKey = energyPanelKey;
+					}
+					else { // recover old temporary key if backoffice disconnected and did not send an acknowledgment message
+						currentKey = Security.unwrapKey(keyPair.getPrivate(), lastTemporaryKey);
+					}
+
+					byte[] energyConsumedBytes = Security.decryptData(rs.getBytes(5), currentKey, iv);
+					byte[] energyConsumedDaytimeBytes = Security.decryptData(rs.getBytes(6), currentKey, iv);
+					byte[] energyConsumedNightBytes = Security.decryptData(rs.getBytes(7), currentKey, iv);
 
 					float energyConsumed = Float.parseFloat(new String(energyConsumedBytes));
 					float energyConsumedDaytime = Float.parseFloat(new String(energyConsumedDaytimeBytes));

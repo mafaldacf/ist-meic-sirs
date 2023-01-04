@@ -166,8 +166,6 @@ public class BackofficeMain {
 
 			statement = dbConnection.createStatement();
 			statement.execute(DROP_ADMIN_TABLE);
-
-			statement = dbConnection.createStatement();
 			statement.execute(CREATE_ADMIN_TABLE);
 
 			System.out.println("Database is ready!");

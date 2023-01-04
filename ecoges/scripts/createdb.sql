@@ -22,8 +22,9 @@ CREATE TABLE clientdb.client (id INTEGER NOT NULL AUTO_INCREMENT,
     energyProduced BLOB, 
     token VARCHAR(64) DEFAULT '', 
     salt BLOB, -- password hash
-    iv BLOB, -- initialization vector using in AES encryption with CBC mode
-    UNIQUE (email), 
+    iv_personal_data BLOB, -- initialization vector using in AES encryption with CBC mode
+    iv_energy_data BLOB, -- initialization vector using in AES encryption with CBC mode
+    UNIQUE (email),
     PRIMARY KEY (id)); 
 
 CREATE TABLE clientdb.appliance (

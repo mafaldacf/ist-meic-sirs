@@ -52,10 +52,6 @@ public class Backoffice {
     private static final String KEY_STORE_ALIAS_ACCOUNT_MANAGEMENT = "accountManagement";
     private static final String KEY_STORE_ALIAS_ENERGY_MANAGEMENT = "energyManagement";
 
-    public Backoffice(Connection dbConnection) {
-        this.dbConnection = dbConnection;
-    }
-
     public Backoffice(Connection dbConnection, String webserverHost, int webserverPort, String rbacHost, int rbacPort) throws IOException, KeyStoreException, CertificateException, NoSuchAlgorithmException {
         this.dbConnection = dbConnection;
 
@@ -104,7 +100,7 @@ public class Backoffice {
                 .build();
     }
 
-    public SecretKey requestCompartmentKey(String username, Compartment compartment, String role,
+    public SecretKey requestCompartmentKey(String username, String clientEmail, Compartment compartment, String role,
                                            ValidatePermissionResponse.Ticket ticket, ByteString signatureRBAC) throws
             NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidRoleException,
             KeyStoreException, IOException, CertificateException, UnrecoverableKeyException, SignatureException,
@@ -143,11 +139,25 @@ public class Backoffice {
                 .setTicket(convertTicket(ticket))
                 .setSignatureRBAC(signatureRBAC)
                 .setTicketBytes(ticket.toByteString())
+                .setClientEmail(clientEmail)
                 .build();
 
         GetCompartmentKeyResponse response = webserver.getCompartmentKey(request);
 
-        return Security.unwrapKey(privateKey, response.getKey().toByteArray());
+        SecretKey key = Security.unwrapKey(privateKey, response.getKey().toByteArray());
+
+        System.out.println("Successfully retrieved the temporary key for " + compartment.name() + " of " + clientEmail);
+
+        return key;
+    }
+
+    public void ackCompartmentKey(String clientEmail, Compartment compartment) {
+        AckCompartmentKeyRequest request = AckCompartmentKeyRequest.newBuilder()
+                .setClientEmail(clientEmail)
+                .setCompartment(compartment)
+                .build();
+
+        webserver.ackCompartmentKey(request);
     }
 
     /*
@@ -347,38 +357,42 @@ public class Backoffice {
 
         ValidatePermissionResponse response = validatePermission(username, role, PermissionType.PERSONAL_DATA);
 
-        SecretKey personalInfoKey = requestCompartmentKey(username, Compartment.PERSONAL_DATA, role, response.getData(), response.getSignature());
+        SecretKey temporaryKey = requestCompartmentKey(username, clientEmail, Compartment.PERSONAL_DATA, role, response.getData(), response.getSignature());
 
-        byte[] iv = getIv(clientEmail);
+        try {
+            byte[] iv = getIv(clientEmail, Compartment.PERSONAL_DATA);
 
-        // get personal info
-        st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
-        st.setString(1, clientEmail);
-        rs = st.executeQuery();
+            // get personal info
+            st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
+            st.setString(1, clientEmail);
+            rs = st.executeQuery();
 
-        if (rs.next()) {
-            String name = rs.getString(1);
-            String email = rs.getString(2);
-            String plan = rs.getString(3);
+            if (rs.next()) {
+                String name = rs.getString(1);
+                String email = rs.getString(2);
+                String plan = rs.getString(3);
 
-            String address = new String(Security.decryptData(rs.getBytes(4), personalInfoKey, iv));
-            String iban = new String(Security.decryptData(rs.getBytes(5), personalInfoKey, iv));
+                String address = new String(Security.decryptData(rs.getBytes(4), temporaryKey, iv));
+                String iban = new String(Security.decryptData(rs.getBytes(5), temporaryKey, iv));
 
-            personalInfo = PersonalInfo.newBuilder()
-                    .setName(name)
-                    .setEmail(email)
-                    .setAddress(address)
-                    .setIBAN(iban)
-                    .setPlan(PlanType.valueOf(plan))
-                    .build();
-        }
-        else {
-            st.close();
-            throw new ClientDoesNotExistException(clientEmail);
+                personalInfo = PersonalInfo.newBuilder()
+                        .setName(name)
+                        .setEmail(email)
+                        .setAddress(address)
+                        .setIBAN(iban)
+                        .setPlan(PlanType.valueOf(plan))
+                        .build();
+            } else {
+                st.close();
+                throw new ClientDoesNotExistException(clientEmail);
+            }
+        } catch (Exception e) {
+            ackCompartmentKey(clientEmail, Compartment.PERSONAL_DATA);
+            throw e;
         }
 
         st.close();
-
+        ackCompartmentKey(clientEmail, Compartment.PERSONAL_DATA);
         return personalInfo;
     }
 
@@ -411,46 +425,50 @@ public class Backoffice {
 
         ValidatePermissionResponse response = validatePermission(username, role, PermissionType.ENERGY_DATA);
 
-        SecretKey energyPanelKey = requestCompartmentKey(username, Compartment.ENERGY_DATA, role, response.getData(), response.getSignature());
+        SecretKey temporaryKey = requestCompartmentKey(username, clientEmail, Compartment.ENERGY_DATA, role, response.getData(), response.getSignature());
 
-        byte[] iv = getIv(clientEmail);
+        try {
+            byte[] iv = getIv(clientEmail, Compartment.ENERGY_DATA);
 
-        int clientId = getClientId(clientEmail);
+            int clientId = getClientId(clientEmail);
 
-        appliances = getAppliances(clientId, energyPanelKey);
-        solarPanels = getSolarPanels(clientId, energyPanelKey);
+            appliances = getAppliances(clientId, temporaryKey);
+            solarPanels = getSolarPanels(clientId, temporaryKey);
 
-        st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
-        st.setString(1, clientEmail);
-        rs = st.executeQuery();
+            st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
+            st.setString(1, clientEmail);
+            rs = st.executeQuery();
 
-        if (rs.next()) {
-            byte[] energyConsumedBytes = Security.decryptData(rs.getBytes(1), energyPanelKey, iv);
-            byte[] energyConsumedDaytimeBytes = Security.decryptData(rs.getBytes(2), energyPanelKey, iv);
-            byte[] energyConsumedNightBytes = Security.decryptData(rs.getBytes(3), energyPanelKey, iv);
-            byte[] energyProducedBytes = Security.decryptData(rs.getBytes(4), energyPanelKey, iv);
+            if (rs.next()) {
+                byte[] energyConsumedBytes = Security.decryptData(rs.getBytes(1), temporaryKey, iv);
+                byte[] energyConsumedDaytimeBytes = Security.decryptData(rs.getBytes(2), temporaryKey, iv);
+                byte[] energyConsumedNightBytes = Security.decryptData(rs.getBytes(3), temporaryKey, iv);
+                byte[] energyProducedBytes = Security.decryptData(rs.getBytes(4), temporaryKey, iv);
 
-            float energyConsumed = Float.parseFloat(new String(energyConsumedBytes));
-            float energyConsumedDaytime = Float.parseFloat(new String(energyConsumedDaytimeBytes));
-            float energyConsumedNight = Float.parseFloat(new String(energyConsumedNightBytes));
-            float energyProduced = Float.parseFloat(new String(energyProducedBytes));
+                float energyConsumed = Float.parseFloat(new String(energyConsumedBytes));
+                float energyConsumedDaytime = Float.parseFloat(new String(energyConsumedDaytimeBytes));
+                float energyConsumedNight = Float.parseFloat(new String(energyConsumedNightBytes));
+                float energyProduced = Float.parseFloat(new String(energyProducedBytes));
 
-            energyPanel = EnergyPanel.newBuilder()
-                    .setEnergyConsumed(energyConsumed)
-                    .setEnergyConsumedDaytime(energyConsumedDaytime)
-                    .setEnergyConsumedNight(energyConsumedNight)
-                    .setEnergyProduced(energyProduced)
-                    .addAllAppliances(appliances)
-                    .addAllSolarPanels(solarPanels)
-                    .build();
-        }
-        else {
-            st.close();
-            throw new ClientDoesNotExistException(clientEmail);
+                energyPanel = EnergyPanel.newBuilder()
+                        .setEnergyConsumed(energyConsumed)
+                        .setEnergyConsumedDaytime(energyConsumedDaytime)
+                        .setEnergyConsumedNight(energyConsumedNight)
+                        .setEnergyProduced(energyProduced)
+                        .addAllAppliances(appliances)
+                        .addAllSolarPanels(solarPanels)
+                        .build();
+            } else {
+                st.close();
+                throw new ClientDoesNotExistException(clientEmail);
+            }
+        } catch (Exception e) {
+            ackCompartmentKey(clientEmail, Compartment.ENERGY_DATA);
+            throw e;
         }
 
         st.close();
-
+        ackCompartmentKey(clientEmail, Compartment.ENERGY_DATA);
         return energyPanel;
     }
 
@@ -460,12 +478,18 @@ public class Backoffice {
     ------------------------------------------------------
     */
 
-    public byte[] getIv(String email) throws SQLException, ClientDoesNotExistException {
+    public byte[] getIv(String email, Compartment compartment) throws SQLException, ClientDoesNotExistException {
         PreparedStatement st;
         ResultSet rs;
         byte[] iv;
 
-        st = dbConnection.prepareStatement(READ_CLIENT_IV);
+        if (compartment.equals(Compartment.PERSONAL_DATA)) {
+            st = dbConnection.prepareStatement(READ_CLIENT_IV_PERSONAL_DATA);
+        }
+        else {
+            st = dbConnection.prepareStatement(READ_CLIENT_IV_ENERGY_DATA);
+        }
+
         st.setString(1, email);
         rs = st.executeQuery();
 

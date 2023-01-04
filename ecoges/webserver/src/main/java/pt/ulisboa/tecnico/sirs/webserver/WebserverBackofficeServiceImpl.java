@@ -27,7 +27,7 @@ public class WebserverBackofficeServiceImpl extends WebserverBackofficeServiceGr
 		GetCompartmentKeyResponse.Builder builder = GetCompartmentKeyResponse.newBuilder();
 		try {
 			byte[] key = server.getCompartmentKey(request.getData(), request.getSignature(), request.getTicket(),
-					request.getSignatureRBAC(), request.getTicketBytes());
+					request.getSignatureRBAC(), request.getTicketBytes(), request.getClientEmail());
 
 			builder.setKey(ByteString.copyFrom(key));
 
@@ -41,7 +41,23 @@ public class WebserverBackofficeServiceImpl extends WebserverBackofficeServiceGr
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (InvalidSignatureException | InvalidCertificateChainException | InvalidTicketUsernameException |
 				 InvalidTicketCompartmentException | InvalidTicketRoleException | InvalidTicketIssuedTimeException |
-				 InvalidTicketValidityTimeException e) {
+				 InvalidTicketValidityTimeException | SQLException e) {
+			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
+		}
+	}
+
+	@Override
+	public void ackCompartmentKey(AckCompartmentKeyRequest request, StreamObserver<AckCompartmentKeyResponse> responseObserver) {
+		AckCompartmentKeyResponse.Builder builder = AckCompartmentKeyResponse.newBuilder();
+		try {
+			server.ackCompartmentKey(request.getClientEmail(), request.getCompartment());
+
+			responseObserver.onNext(builder.build());
+			responseObserver.onCompleted();
+		} catch (IllegalBlockSizeException | NoSuchPaddingException | NoSuchAlgorithmException | InvalidKeyException |
+				 BadPaddingException | InvalidAlgorithmParameterException  e) {
+			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+		} catch (SQLException e) {
 			responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException());
 		}
 	}

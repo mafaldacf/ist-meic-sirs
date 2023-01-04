@@ -8,7 +8,9 @@ option java_multiple_files = true;
 
 service WebserverBackofficeService {
   rpc getCompartmentKey(GetCompartmentKeyRequest) returns (GetCompartmentKeyResponse);
+  rpc ackCompartmentKey(AckCompartmentKeyRequest) returns (AckCompartmentKeyResponse);
 }
+
 
 enum Compartment {
   PERSONAL_DATA = 0;
@@ -18,6 +20,14 @@ enum Compartment {
 enum RoleTypes {
   ACCOUNT_MANAGER = 0;
   ENERGY_MANAGER = 1;
+}
+
+message AckCompartmentKeyRequest {
+  string clientEmail = 1;
+  Compartment compartment = 2;
+}
+
+message AckCompartmentKeyResponse {
 }
 
 message GetCompartmentKeyRequest {
@@ -40,8 +50,11 @@ message GetCompartmentKeyRequest {
   Ticket ticket = 4;
   bytes signatureRBAC = 5;
 
+  // to generate temporary secret key
+  string clientEmail = 6;
+
   // ticket was converted to current protobuf Ticket type and we need the original bytes to later verify the signature of RBAC
-  bytes ticketBytes = 6;
+  bytes ticketBytes = 7;
 }
 
 message GetCompartmentKeyResponse {
