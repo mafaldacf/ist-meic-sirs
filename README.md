@@ -139,20 +139,6 @@ Add `clientdb` schema:
     sudo mysql
         source createdb.sql
 
-Add symmetric encryption mechanism:
-
-        install plugin keyring_file soname 'keyring_file.so';
-        show variables like '%keyring%';
-
-Later, when the system is running, we can verify that the database tables are encrypted using:
-
-        SELECT TABLE_SCHEMA, TABLE_NAME, CREATE_OPTIONS FROM INFORMATION_SCHEMA.TABLES WHERE CREATE_OPTIONS LIKE '%ENCRYPTION%';
-
-
-Note that the master encryption key should be rotated periodically and whenever you suspect that the key has been compromised using:
-
-        ALTER INSTANCE ROTATE INNODB MASTER KEY;
-
 Create an user for webserver and backoffice with hosts `192.168.0.2` and `192.168.2.2`, respectively (alternatively, can use `localhost` during development) and add privileges:
 
         CREATE USER 'ecoges'@'192.168.0.2' IDENTIFIED BY 'admin';
@@ -197,13 +183,6 @@ Verify if everything is ok, having the following field values: `have_openssl` = 
     sudo service mysql restart
     sudo mysql
         show variables like '%ssl%';
-    exit
-
-Generate the database tables using the SQL script:
-
-    cd ecoges/scripts
-    sudo mysql
-        source createDatabaseTables.sql
     exit
 
 

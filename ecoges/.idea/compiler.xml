@@ -9,17 +9,17 @@
         <module name="backoffice" />
         <module name="security" />
         <module name="rbac" />
-        <module name="rbac-contract" />
         <module name="client" />
         <module name="admin" />
-        <module name="webserver-contract" />
         <module name="webserver" />
-        <module name="backoffice-contract" />
+        <module name="contracts" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
+      <module name="backoffice-contract" target="11" />
       <module name="contract" target="11" />
       <module name="employee" target="9" />
+      <module name="rbac-contract" target="11" />
       <module name="server" target="9" />
       <module name="server-contract" target="11" />
     </bytecodeTargetLevel>

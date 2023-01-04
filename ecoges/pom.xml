@@ -38,11 +38,9 @@
 		builds the selected projects in order. -->
 	<modules>
 		<module>security</module>
-		<module>webserver-contract</module>
+		<module>contracts</module>
 		<module>webserver</module>
-		<module>rbac-contract</module>
 		<module>rbac</module>
-		<module>backoffice-contract</module>
 		<module>backoffice</module>
 		<module>client</module>
 		<module>admin</module>

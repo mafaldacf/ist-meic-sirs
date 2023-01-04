@@ -3,7 +3,7 @@ package pt.ulisboa.tecnico.sirs.rbac;
 import org.junit.*;
 import pt.ulisboa.tecnico.sirs.rbac.exceptions.InvalidRoleException;
 import pt.ulisboa.tecnico.sirs.rbac.exceptions.PermissionDeniedException;
-import pt.ulisboa.tecnico.sirs.rbac.grpc.*;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.*;
 import pt.ulisboa.tecnico.sirs.security.Security;
 
 import javax.crypto.NoSuchPaddingException;
@@ -41,12 +41,12 @@ public class ValidatePermissionsTests {
 
     @Test
     public void validatePermissionGrantedAMTest() throws InvalidRoleException, PermissionDeniedException, UnrecoverableKeyException, NoSuchPaddingException, CertificateException, NoSuchAlgorithmException, KeyStoreException, IOException, SignatureException, InvalidKeyException {
-        ValidatePermissionResponse response = rbac.validatePermissions("account manager", Role.ACCOUNT_MANAGER, PermissionType.PERSONAL_DATA);
-        ValidatePermissionResponse.Ticket ticket = response.getData();
+        ValidatePermissionResponse response = rbac.validatePermissions("account manager", RoleType.ACCOUNT_MANAGER, CompartmentType.PERSONAL_DATA);
+        Ticket ticket = response.getData();
 
         Assert.assertEquals("account manager", ticket.getUsername());
-        Assert.assertEquals(Role.ACCOUNT_MANAGER.name(), ticket.getRole().name());
-        Assert.assertEquals(PermissionType.PERSONAL_DATA.name(), ticket.getPermission().name());
+        Assert.assertEquals(RoleType.ACCOUNT_MANAGER.name(), ticket.getRole().name());
+        Assert.assertEquals(CompartmentType.PERSONAL_DATA.name(), ticket.getPermission().name());
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -61,12 +61,12 @@ public class ValidatePermissionsTests {
 
     @Test
     public void validatePermissionGrantedEMTest() throws InvalidRoleException, PermissionDeniedException, UnrecoverableKeyException, NoSuchPaddingException, CertificateException, NoSuchAlgorithmException, KeyStoreException, IOException, SignatureException, InvalidKeyException {
-        ValidatePermissionResponse response = rbac.validatePermissions("energy manager", Role.ENERGY_MANAGER, PermissionType.ENERGY_DATA);
-        ValidatePermissionResponse.Ticket ticket = response.getData();
+        ValidatePermissionResponse response = rbac.validatePermissions("energy manager", RoleType.ENERGY_MANAGER, CompartmentType.ENERGY_DATA);
+        Ticket ticket = response.getData();
 
         Assert.assertEquals("energy manager", ticket.getUsername());
-        Assert.assertEquals(Role.ENERGY_MANAGER.name(), ticket.getRole().name());
-        Assert.assertEquals(PermissionType.ENERGY_DATA.name(), ticket.getPermission().name());
+        Assert.assertEquals(RoleType.ENERGY_MANAGER.name(), ticket.getRole().name());
+        Assert.assertEquals(CompartmentType.ENERGY_DATA.name(), ticket.getPermission().name());
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -82,12 +82,12 @@ public class ValidatePermissionsTests {
     @Test
     public void validatePermissionDeniedAMTest()  {
         Assert.assertThrows(PermissionDeniedException.class, () ->
-            rbac.validatePermissions("account manager", Role.ACCOUNT_MANAGER, PermissionType.ENERGY_DATA));
+            rbac.validatePermissions("account manager", RoleType.ACCOUNT_MANAGER, CompartmentType.ENERGY_DATA));
     }
 
     @Test
     public void validatePermissionDeniedEMTest()  {
         Assert.assertThrows(PermissionDeniedException.class, () ->
-                rbac.validatePermissions("energy manager", Role.ENERGY_MANAGER, PermissionType.PERSONAL_DATA));
+                rbac.validatePermissions("energy manager", RoleType.ENERGY_MANAGER, CompartmentType.PERSONAL_DATA));
     }
 }

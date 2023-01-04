@@ -14,8 +14,7 @@ import io.grpc.netty.GrpcSslContexts;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import pt.ulisboa.tecnico.sirs.security.Security;
-import pt.ulisboa.tecnico.sirs.webserver.exceptions.ClientDoesNotExistException;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.PlanType;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.PlanType;
 
 import javax.crypto.*;
 
@@ -279,7 +278,7 @@ public class WebserverMain {
 		}
 		@Override
 		public void run() {
-			System.out.println("\nGenerating new invoices for " + months.get(currMonth) + " " + currYear);
+			System.out.println("Generating new invoices for " + months.get(currMonth) + " " + currYear);
 			PreparedStatement st;
 			ResultSet rs;
 			SecretKey currentKey;
@@ -296,7 +295,8 @@ public class WebserverMain {
 					if(lastTemporaryKey == null) {
 						currentKey = energyPanelKey;
 					}
-					else { // recover old temporary key if backoffice disconnected and did not send an acknowledgment message
+					// recover temporary key
+					else {
 						currentKey = Security.unwrapKey(keyPair.getPrivate(), lastTemporaryKey);
 					}
 

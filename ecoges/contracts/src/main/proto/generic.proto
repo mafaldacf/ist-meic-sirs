@@ -1,0 +1,27 @@
+//
+// Protocol buffers definition
+//
+syntax = "proto3";
+package pt.ulisboa.tecnico.sirs.contracts.grpc;
+
+option java_multiple_files = true;
+
+// generic proto for rbac and webserver-backoffice protobufs
+
+enum CompartmentType {
+	PERSONAL_DATA = 0;
+	ENERGY_DATA = 1;
+}
+
+enum RoleType {
+	ACCOUNT_MANAGER = 0;
+	ENERGY_MANAGER = 1;
+}
+
+message Ticket {
+	string username = 1;
+	RoleType role = 2;
+	CompartmentType permission = 3;
+	string requestIssuedAt = 4;
+	string requestValidUntil = 5;
+}

@@ -5,7 +5,7 @@ import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.*;
 
 import java.io.IOException;
 import java.io.InputStream;

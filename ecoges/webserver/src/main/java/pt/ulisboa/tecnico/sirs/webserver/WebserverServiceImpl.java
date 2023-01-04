@@ -3,7 +3,7 @@ package pt.ulisboa.tecnico.sirs.webserver;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.*;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;

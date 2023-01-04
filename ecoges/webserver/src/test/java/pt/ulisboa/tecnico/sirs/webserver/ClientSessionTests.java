@@ -5,8 +5,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.PersonalInfo;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.PlanType;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.PersonalInfo;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.PlanType;
 
 import javax.crypto.*;
 import java.io.IOException;

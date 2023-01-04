@@ -1,9 +1,12 @@
 package pt.ulisboa.tecnico.sirs.rbac;
 
 import com.google.protobuf.ByteString;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.CompartmentType;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.RoleType;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.ValidatePermissionResponse;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.rbac.exceptions.*;
-import pt.ulisboa.tecnico.sirs.rbac.grpc.*;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.*;
 
 import javax.crypto.NoSuchPaddingException;
 import java.io.IOException;
@@ -20,9 +23,9 @@ public class Rbac {
     
     private RbacServiceGrpc.RbacServiceBlockingStub rbacserver;
 
-    Map<Role, PermissionType> PermissionsByRoles = Map.ofEntries(
-        Map.entry(Role.ENERGY_MANAGER, PermissionType.ENERGY_DATA),
-        Map.entry(Role.ACCOUNT_MANAGER, PermissionType.PERSONAL_DATA)
+    Map<RoleType, CompartmentType> PermissionsByRoles = Map.ofEntries(
+        Map.entry(RoleType.ENERGY_MANAGER, CompartmentType.ENERGY_DATA),
+        Map.entry(RoleType.ACCOUNT_MANAGER, CompartmentType.PERSONAL_DATA)
     );
 
     // Data compartments
@@ -41,7 +44,7 @@ public class Rbac {
         KEY_STORE_FILE = "../rbac/src/main/resources/rbac.keystore";
     }
 
-    public ValidatePermissionResponse generateResponse(String username, Role role, PermissionType permission) throws
+    public ValidatePermissionResponse generateResponse(String username, RoleType role, CompartmentType permission) throws
         NoSuchAlgorithmException, InvalidKeyException, KeyStoreException, IOException,
         CertificateException, UnrecoverableKeyException, SignatureException 
     {
@@ -56,7 +59,7 @@ public class Rbac {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime nowPlusSeconds = now.plusSeconds(30);
 
-        ValidatePermissionResponse.Ticket data = ValidatePermissionResponse.Ticket.newBuilder()
+        Ticket data = Ticket.newBuilder()
                 .setUsername(username)
                 .setRole(role)
                 .setPermission(permission)
@@ -80,7 +83,7 @@ public class Rbac {
     ------------------------------------------------
     */
 
-    public ValidatePermissionResponse validatePermissions(String username, Role role, PermissionType permission) throws NoSuchPaddingException,
+    public ValidatePermissionResponse validatePermissions(String username, RoleType role, CompartmentType permission) throws NoSuchPaddingException,
         NoSuchAlgorithmException, InvalidKeyException, KeyStoreException, IOException,
         CertificateException, UnrecoverableKeyException, SignatureException,
         PermissionDeniedException, InvalidRoleException

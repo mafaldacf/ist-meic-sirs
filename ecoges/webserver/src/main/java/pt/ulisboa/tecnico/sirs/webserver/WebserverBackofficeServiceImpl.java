@@ -4,7 +4,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.*;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
@@ -27,7 +27,7 @@ public class WebserverBackofficeServiceImpl extends WebserverBackofficeServiceGr
 		GetCompartmentKeyResponse.Builder builder = GetCompartmentKeyResponse.newBuilder();
 		try {
 			byte[] key = server.getCompartmentKey(request.getData(), request.getSignature(), request.getTicket(),
-					request.getSignatureRBAC(), request.getTicketBytes(), request.getClientEmail());
+					request.getSignatureRBAC(), request.getClientEmail());
 
 			builder.setKey(ByteString.copyFrom(key));
 
@@ -50,7 +50,7 @@ public class WebserverBackofficeServiceImpl extends WebserverBackofficeServiceGr
 	public void ackCompartmentKey(AckCompartmentKeyRequest request, StreamObserver<AckCompartmentKeyResponse> responseObserver) {
 		AckCompartmentKeyResponse.Builder builder = AckCompartmentKeyResponse.newBuilder();
 		try {
-			server.ackCompartmentKey(request.getClientEmail(), request.getCompartment());
+			server.discardTemporaryKey(request.getClientEmail(), request.getCompartment());
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();

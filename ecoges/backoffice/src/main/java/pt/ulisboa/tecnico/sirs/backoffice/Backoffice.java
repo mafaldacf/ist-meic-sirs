@@ -12,11 +12,11 @@ import pt.ulisboa.tecnico.sirs.backoffice.grpc.EnergyPanel;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.PersonalInfo;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.PlanType;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.SolarPanel;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.RoleType;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.backoffice.exceptions.*;
 import pt.ulisboa.tecnico.sirs.backoffice.grpc.*;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
-import pt.ulisboa.tecnico.sirs.rbac.grpc.*;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.*;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
@@ -90,18 +90,8 @@ public class Backoffice {
     ------------------------------------------------
     */
 
-    public GetCompartmentKeyRequest.Ticket convertTicket(ValidatePermissionResponse.Ticket ticket) {
-        return GetCompartmentKeyRequest.Ticket.newBuilder()
-                .setUsername(ticket.getUsername())
-                .setRole(RoleTypes.valueOf(ticket.getRole().name()))
-                .setCompartment(Compartment.valueOf(ticket.getPermission().name()))
-                .setRequestIssuedAt(ticket.getRequestIssuedAt())
-                .setRequestValidUntil(ticket.getRequestValidUntil())
-                .build();
-    }
-
-    public SecretKey requestCompartmentKey(String username, String clientEmail, Compartment compartment, String role,
-                                           ValidatePermissionResponse.Ticket ticket, ByteString signatureRBAC) throws
+    public SecretKey requestCompartmentKey(String username, String clientEmail, CompartmentType compartment, String role,
+                                           Ticket ticket, ByteString signatureRBAC) throws
             NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidRoleException,
             KeyStoreException, IOException, CertificateException, UnrecoverableKeyException, SignatureException,
             StatusRuntimeException {
@@ -126,7 +116,7 @@ public class Backoffice {
 
         GetCompartmentKeyRequest.RequestData data = GetCompartmentKeyRequest.RequestData.newBuilder()
                 .setUsername(username)
-                .setRole(RoleTypes.valueOf(role))
+                .setRole(RoleType.valueOf(role))
                 .setCompartment(compartment)
                 .setCertificate(ByteString.copyFrom(certificate.getEncoded()))
                 .build();
@@ -136,9 +126,8 @@ public class Backoffice {
         GetCompartmentKeyRequest request = GetCompartmentKeyRequest.newBuilder()
                 .setData(data)
                 .setSignature(signature)
-                .setTicket(convertTicket(ticket))
+                .setTicket(ticket)
                 .setSignatureRBAC(signatureRBAC)
-                .setTicketBytes(ticket.toByteString())
                 .setClientEmail(clientEmail)
                 .build();
 
@@ -151,7 +140,7 @@ public class Backoffice {
         return key;
     }
 
-    public void ackCompartmentKey(String clientEmail, Compartment compartment) {
+    public void ackCompartmentKey(String clientEmail, CompartmentType compartment) {
         AckCompartmentKeyRequest request = AckCompartmentKeyRequest.newBuilder()
                 .setClientEmail(clientEmail)
                 .setCompartment(compartment)
@@ -318,11 +307,11 @@ public class Backoffice {
         return clients;
     }
 
-    public ValidatePermissionResponse validatePermission(String username, String role, PermissionType permission)
+    public ValidatePermissionResponse validatePermission(String username, String role, CompartmentType permission)
     {
         ValidatePermissionRequest request = ValidatePermissionRequest.newBuilder()
             .setUsername(username)
-            .setRole(Role.valueOf(role))
+            .setRole(RoleType.valueOf(role))
             .setPermission(permission)
             .build();
 
@@ -355,12 +344,12 @@ public class Backoffice {
             throw new AdminDoesNotExistException(username);
         }
 
-        ValidatePermissionResponse response = validatePermission(username, role, PermissionType.PERSONAL_DATA);
+        ValidatePermissionResponse response = validatePermission(username, role, CompartmentType.PERSONAL_DATA);
 
-        SecretKey temporaryKey = requestCompartmentKey(username, clientEmail, Compartment.PERSONAL_DATA, role, response.getData(), response.getSignature());
+        SecretKey temporaryKey = requestCompartmentKey(username, clientEmail, CompartmentType.PERSONAL_DATA, role, response.getData(), response.getSignature());
 
         try {
-            byte[] iv = getIv(clientEmail, Compartment.PERSONAL_DATA);
+            byte[] iv = getIv(clientEmail, CompartmentType.PERSONAL_DATA);
 
             // get personal info
             st = dbConnection.prepareStatement(READ_CLIENT_PERSONAL_INFO);
@@ -387,12 +376,12 @@ public class Backoffice {
                 throw new ClientDoesNotExistException(clientEmail);
             }
         } catch (Exception e) {
-            ackCompartmentKey(clientEmail, Compartment.PERSONAL_DATA);
+            ackCompartmentKey(clientEmail, CompartmentType.PERSONAL_DATA);
             throw e;
         }
 
         st.close();
-        ackCompartmentKey(clientEmail, Compartment.PERSONAL_DATA);
+        ackCompartmentKey(clientEmail, CompartmentType.PERSONAL_DATA);
         return personalInfo;
     }
 
@@ -423,12 +412,12 @@ public class Backoffice {
             throw new AdminDoesNotExistException(username);
         }
 
-        ValidatePermissionResponse response = validatePermission(username, role, PermissionType.ENERGY_DATA);
+        ValidatePermissionResponse response = validatePermission(username, role, CompartmentType.ENERGY_DATA);
 
-        SecretKey temporaryKey = requestCompartmentKey(username, clientEmail, Compartment.ENERGY_DATA, role, response.getData(), response.getSignature());
+        SecretKey temporaryKey = requestCompartmentKey(username, clientEmail, CompartmentType.ENERGY_DATA, role, response.getData(), response.getSignature());
 
         try {
-            byte[] iv = getIv(clientEmail, Compartment.ENERGY_DATA);
+            byte[] iv = getIv(clientEmail, CompartmentType.ENERGY_DATA);
 
             int clientId = getClientId(clientEmail);
 
@@ -463,12 +452,12 @@ public class Backoffice {
                 throw new ClientDoesNotExistException(clientEmail);
             }
         } catch (Exception e) {
-            ackCompartmentKey(clientEmail, Compartment.ENERGY_DATA);
+            ackCompartmentKey(clientEmail, CompartmentType.ENERGY_DATA);
             throw e;
         }
 
         st.close();
-        ackCompartmentKey(clientEmail, Compartment.ENERGY_DATA);
+        ackCompartmentKey(clientEmail, CompartmentType.ENERGY_DATA);
         return energyPanel;
     }
 
@@ -478,12 +467,12 @@ public class Backoffice {
     ------------------------------------------------------
     */
 
-    public byte[] getIv(String email, Compartment compartment) throws SQLException, ClientDoesNotExistException {
+    public byte[] getIv(String email, CompartmentType compartment) throws SQLException, ClientDoesNotExistException {
         PreparedStatement st;
         ResultSet rs;
         byte[] iv;
 
-        if (compartment.equals(Compartment.PERSONAL_DATA)) {
+        if (compartment.equals(CompartmentType.PERSONAL_DATA)) {
             st = dbConnection.prepareStatement(READ_CLIENT_IV_PERSONAL_DATA);
         }
         else {

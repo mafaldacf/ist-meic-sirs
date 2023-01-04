@@ -2,29 +2,20 @@
 // Protocol buffers definition
 //
 syntax = "proto3";
-package pt.ulisboa.tecnico.sirs.webserver.grpc;
+package pt.ulisboa.tecnico.sirs.contracts.grpc;
 
 option java_multiple_files = true;
+
+import "generic.proto";
 
 service WebserverBackofficeService {
   rpc getCompartmentKey(GetCompartmentKeyRequest) returns (GetCompartmentKeyResponse);
   rpc ackCompartmentKey(AckCompartmentKeyRequest) returns (AckCompartmentKeyResponse);
 }
 
-
-enum Compartment {
-  PERSONAL_DATA = 0;
-  ENERGY_DATA = 1;
-}
-
-enum RoleTypes {
-  ACCOUNT_MANAGER = 0;
-  ENERGY_MANAGER = 1;
-}
-
 message AckCompartmentKeyRequest {
   string clientEmail = 1;
-  Compartment compartment = 2;
+  CompartmentType compartment = 2;
 }
 
 message AckCompartmentKeyResponse {
@@ -33,28 +24,15 @@ message AckCompartmentKeyResponse {
 message GetCompartmentKeyRequest {
   message RequestData {
     string username = 1;
-    RoleTypes role = 2;
-    Compartment compartment = 3;
+    RoleType role = 2;
+    CompartmentType compartment = 3;
     bytes certificate = 4;
   }
-  message Ticket {
-    string username = 1;
-    RoleTypes role = 2;
-    Compartment compartment = 3;
-    string requestIssuedAt = 4;
-    string requestValidUntil = 5;
-  }
-
   RequestData data = 2;
   bytes signature = 3;
   Ticket ticket = 4;
   bytes signatureRBAC = 5;
-
-  // to generate temporary secret key
-  string clientEmail = 6;
-
-  // ticket was converted to current protobuf Ticket type and we need the original bytes to later verify the signature of RBAC
-  bytes ticketBytes = 7;
+  string clientEmail = 6; // to generate temporary secret key
 }
 
 message GetCompartmentKeyResponse {

@@ -13,7 +13,7 @@ import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyServerBuilder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.WebserverBackofficeServiceGrpc;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.WebserverBackofficeServiceGrpc;
 
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;

@@ -3,7 +3,7 @@ package pt.ulisboa.tecnico.sirs.webserver;
 import com.google.protobuf.ByteString;
 import pt.ulisboa.tecnico.sirs.security.Security;
 import pt.ulisboa.tecnico.sirs.webserver.exceptions.*;
-import pt.ulisboa.tecnico.sirs.webserver.grpc.*;
+import pt.ulisboa.tecnico.sirs.contracts.grpc.*;
 
 import javax.crypto.*;
 import java.io.ByteArrayInputStream;
@@ -81,8 +81,7 @@ public class Webserver {
         return departmentPublicKey;
     }
 
-    public void verifyRBACResponse(GetCompartmentKeyRequest.Ticket ticket, ByteString ticketBytes,
-                                   ByteString signatureRBAC, GetCompartmentKeyRequest.RequestData request)
+    public void verifyRBACResponse(Ticket ticket, ByteString signatureRBAC, GetCompartmentKeyRequest.RequestData request)
             throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException, SignatureException,
             InvalidKeyException, InvalidSignatureException, InvalidTicketUsernameException, InvalidTicketRoleException,
             InvalidTicketCompartmentException, InvalidTicketIssuedTimeException, InvalidTicketValidityTimeException {
@@ -96,7 +95,7 @@ public class Webserver {
         PublicKey publicKeyRBAC = certificateRBAC.getPublicKey();
 
         // Verify authenticity and integrity of the response
-        if (!Security.verifySignature(publicKeyRBAC, signatureRBAC.toByteArray(), ticketBytes.toByteArray())) {
+        if (!Security.verifySignature(publicKeyRBAC, signatureRBAC.toByteArray(), ticket.toByteArray())) {
             throw new InvalidSignatureException();
         }
 
@@ -107,8 +106,8 @@ public class Webserver {
         if (!ticket.getRole().equals(request.getRole())) {
             throw new InvalidTicketRoleException(ticket.getRole().name(), request.getRole().name());
         }
-        if (!ticket.getCompartment().equals(request.getCompartment())) {
-            throw new InvalidTicketCompartmentException(ticket.getCompartment().name(), request.getCompartment().name());
+        if (!ticket.getPermission().equals(request.getCompartment())) {
+            throw new InvalidTicketCompartmentException(ticket.getPermission().name(), request.getCompartment().name());
         }
 
         // Validate ticket timestamps
@@ -125,17 +124,17 @@ public class Webserver {
         }
     }
 
-    public void ackCompartmentKey(String clientEmail, Compartment compartment) throws InvalidAlgorithmParameterException, SQLException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+    public void discardTemporaryKey(String clientEmail, CompartmentType compartment) throws InvalidAlgorithmParameterException, SQLException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
         Statement st;
 
         // start transaction due to the long set of operations and the existence of concurrent accesses to the client data
         st = dbConnection.createStatement();
         st.execute(START_TRANSACTION);
         try {
-            if (compartment.equals(Compartment.PERSONAL_DATA)) {
-                updatePersonalDataWithNewKey(personalInfoKey, clientEmail);
+            if (compartment.equals(CompartmentType.PERSONAL_DATA)) {
+                reEncryptPersonalDataWithNewKey(personalInfoKey, clientEmail);
             } else {
-                updateEnergyDataWithNewKey(energyPanelKey, clientEmail);
+                reEncryptEnergyDataWithNewKey(energyPanelKey, clientEmail);
             }
         } catch (Exception e) {
             st = dbConnection.createStatement();
@@ -150,8 +149,7 @@ public class Webserver {
     }
 
     public byte[] getCompartmentKey(GetCompartmentKeyRequest.RequestData data, ByteString signature,
-                                    GetCompartmentKeyRequest.Ticket ticket, ByteString signatureRBAC,
-                                    ByteString ticketBytes, String clientEmail)
+                                    Ticket ticket, ByteString signatureRBAC, String clientEmail)
             throws CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException,
             InvalidKeyException, InvalidKeySpecException, SignatureException, InvalidSignatureException, BadPaddingException,
             KeyStoreException, IOException, InvalidAlgorithmParameterException, InvalidCertificateChainException,
@@ -161,7 +159,7 @@ public class Webserver {
         Statement st;
 
         PublicKey departmentPublicKey = verifyDepartmentRequest(data, signature);
-        verifyRBACResponse(ticket, ticketBytes, signatureRBAC, data);
+        verifyRBACResponse(ticket, signatureRBAC, data);
 
         // Generate temporary key
         KeyGenerator keyGen = KeyGenerator.getInstance("AES");
@@ -173,10 +171,10 @@ public class Webserver {
         st.execute(START_TRANSACTION);
 
         try {
-            if (data.getCompartment().name().equals(Compartment.PERSONAL_DATA.name())) {
-                updatePersonalDataWithNewKey(temporaryKey, clientEmail);
-            } else if (data.getCompartment().name().equals(Compartment.ENERGY_DATA.name())) {
-                updateEnergyDataWithNewKey(temporaryKey, clientEmail);
+            if (data.getCompartment().name().equals(CompartmentType.PERSONAL_DATA.name())) {
+                reEncryptPersonalDataWithNewKey(temporaryKey, clientEmail);
+            } else if (data.getCompartment().name().equals(CompartmentType.ENERGY_DATA.name())) {
+                reEncryptEnergyDataWithNewKey(temporaryKey, clientEmail);
             }
         } catch (Exception e) {
             st = dbConnection.createStatement();
@@ -231,15 +229,15 @@ public class Webserver {
         st.execute();
     }
 
-    public void updatePersonalDataWithNewKey(SecretKey newKey, String clientEmail) throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+    public void reEncryptPersonalDataWithNewKey(SecretKey newKey, String clientEmail) throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
         SecretKey oldKey = computeOldKey(personalInfoKey, READ_CLIENT_LAST_TEMPORARY_PERSONAL_KEY, clientEmail);
         if (oldKey == null)  return;
-        updateClientPersonalData(clientEmail, oldKey, newKey);
+        reEncryptClientPersonalData(clientEmail, oldKey, newKey);
 
         saveNewKey(personalInfoKey, newKey, UPDATE_CLIENT_TEMPORARY_PERSONAL_KEY, clientEmail);
     }
 
-    public void updateClientPersonalData(String clientEmail, SecretKey oldKey, SecretKey newKey)
+    public void reEncryptClientPersonalData(String clientEmail, SecretKey oldKey, SecretKey newKey)
             throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException,
             NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
 
@@ -275,18 +273,18 @@ public class Webserver {
 
     }
 
-    public void updateEnergyDataWithNewKey(SecretKey newKey, String clientEmail) throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+    public void reEncryptEnergyDataWithNewKey(SecretKey newKey, String clientEmail) throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
         SecretKey oldKey = computeOldKey(energyPanelKey, READ_CLIENT_LAST_TEMPORARY_ENERGY_KEY, clientEmail);
         if (oldKey == null) return;
 
-        int clientId = updateClientGeneralEnergy(clientEmail, oldKey, newKey);
-        updateClientAppliancesEnergy(clientId, oldKey, newKey);
-        updateClientSolarPanelsEnergy(clientId, oldKey, newKey);
+        int clientId = reEncryptClientGeneralEnergy(clientEmail, oldKey, newKey);
+        reEncryptClientAppliancesEnergy(clientId, oldKey, newKey);
+        reEncryptClientSolarPanelsEnergy(clientId, oldKey, newKey);
 
         saveNewKey(energyPanelKey, newKey, UPDATE_CLIENT_TEMPORARY_ENERGY_KEY, clientEmail);
     }
 
-    public int updateClientGeneralEnergy(String clientEmail, SecretKey oldKey, SecretKey newKey)
+    public int reEncryptClientGeneralEnergy(String clientEmail, SecretKey oldKey, SecretKey newKey)
             throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException,
             NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
 
@@ -336,7 +334,7 @@ public class Webserver {
         return clientId;
     }
 
-    public void updateClientAppliancesEnergy(int clientId, SecretKey oldKey, SecretKey newKey)
+    public void reEncryptClientAppliancesEnergy(int clientId, SecretKey oldKey, SecretKey newKey)
             throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException,
             NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
 
@@ -376,7 +374,7 @@ public class Webserver {
         rs.close();
     }
 
-    public void updateClientSolarPanelsEnergy(int clientId, SecretKey oldKey, SecretKey newKey)
+    public void reEncryptClientSolarPanelsEnergy(int clientId, SecretKey oldKey, SecretKey newKey)
             throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException,
             NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
 
@@ -737,6 +735,24 @@ public class Webserver {
         return personalInfo;
     }
 
+    public void discardTemporaryKeyIfExists(String email) throws SQLException, InvalidAlgorithmParameterException, IllegalBlockSizeException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+        PreparedStatement st;
+        ResultSet rs;
+        byte[] temporaryKey = null;
+
+        st = dbConnection.prepareStatement(READ_CLIENT_LAST_TEMPORARY_ENERGY_KEY);
+        st.setString(1, email);
+        rs = st.executeQuery();
+
+        while(rs.next()) {
+            temporaryKey = rs.getBytes(1);
+        }
+
+        if (temporaryKey != null) { // discard key and re-encrypt data with master key
+            discardTemporaryKey(email, CompartmentType.ENERGY_DATA);
+        }
+    }
+
     public EnergyPanel checkEnergyPanel(String email, String hashedToken)
             throws ClientDoesNotExistException, SQLException, InvalidSessionTokenException,
             CompartmentKeyException, IllegalBlockSizeException, NoSuchPaddingException,
@@ -754,7 +770,11 @@ public class Webserver {
         appliances = getAppliances(client_id);
         solarPanels = getSolarPanels(client_id);
 
-        byte[] iv = getIv(email, Compartment.ENERGY_DATA);
+        // make sure there is no pending temporary key to discard due to the failure
+        // of a department that did not send an acknowledgment message
+        discardTemporaryKeyIfExists(email);
+
+        byte[] iv = getIv(email, CompartmentType.ENERGY_DATA);
 
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PANEL);
         st.setString(1, email);
@@ -847,7 +867,7 @@ public class Webserver {
 
         validateSession(email, hashedToken);
 
-        byte[] iv = getIv(email, Compartment.PERSONAL_DATA);
+        byte[] iv = getIv(email, CompartmentType.PERSONAL_DATA);
 
         st = dbConnection.prepareStatement(UPDATE_CLIENT_ADDRESS);
         st.setBytes(1, Security.encryptData(address, personalInfoKey, iv));
@@ -876,12 +896,12 @@ public class Webserver {
     ------------------------------------------------------
      */
 
-    public byte[] getIv(String email, Compartment compartment) throws SQLException, ClientDoesNotExistException {
+    public byte[] getIv(String email, CompartmentType compartment) throws SQLException, ClientDoesNotExistException {
         PreparedStatement st;
         ResultSet rs;
         byte[] iv;
 
-        if (compartment.equals(Compartment.PERSONAL_DATA)) {
+        if (compartment.equals(CompartmentType.PERSONAL_DATA)) {
             st = dbConnection.prepareStatement(READ_CLIENT_IV_PERSONAL_DATA);
         }
         else {
@@ -932,7 +952,7 @@ public class Webserver {
         ResultSet rs;
         float currEnergyConsumed, currEnergyConsumedDaytime, currEnergyConsumedNight;
 
-        byte[] iv = getIv(email, Compartment.ENERGY_DATA);
+        byte[] iv = getIv(email, CompartmentType.ENERGY_DATA);
 
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_CONSUMPTION);
@@ -978,7 +998,7 @@ public class Webserver {
         ResultSet rs;
         float currEnergyProduced;
 
-        byte[] iv = getIv(email, Compartment.ENERGY_DATA);
+        byte[] iv = getIv(email, CompartmentType.ENERGY_DATA);
 
         // get current energy consumption
         st = dbConnection.prepareStatement(READ_CLIENT_ENERGY_PRODUCTION);

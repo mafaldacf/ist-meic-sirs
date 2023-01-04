@@ -37,7 +37,7 @@
 		</dependency>
 		<dependency>
 			<groupId>pt.ulisboa.tecnico.sirs</groupId>
-			<artifactId>webserver-contract</artifactId>
+			<artifactId>contracts</artifactId>
 			<version>1.0.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>

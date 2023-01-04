@@ -36,7 +36,7 @@
 		</dependency>
 		<dependency>
 			<groupId>pt.ulisboa.tecnico.sirs</groupId>
-			<artifactId>rbac-contract</artifactId>
+			<artifactId>contracts</artifactId>
 			<version>1.0.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
@@ -45,7 +45,7 @@
 			<version>4.13</version>
 			<scope>test</scope>
 		</dependency>
-	</dependencies>
+    </dependencies>
 
 	<build>
 		<!-- Resources are files like properties, images, etc; used by the module.  -->
