@@ -31,4 +31,4 @@ sudo iptables -A FORWARD -i enp0s9 -p tcp --sport 1024: --dport 3306 -m state --
 sudo iptables -A FORWARD -i enp0s9 -p tcp --sport 1024: --dport 8000 -m state --state NEW -d 192.168.0.2 -j ACCEPT
 
 #redirect external conections to web server
-sudo iptables -t nat -A PREROUTING -i enp0s10 --dst 10.0.2.4 -p tcp --dport 8000 -j DNAT --to-destination 192.168.0.2
+sudo iptables -t nat -A PREROUTING -i enp0s10 --dst 10.0.2.10 -p tcp --dport 8000 -j DNAT --to-destination 192.168.0.2

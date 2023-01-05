@@ -55,7 +55,7 @@ All machines will be running on Linux and configured according to the following 
 | __Client Machine__ |||||||||
 | 1 | INTERNET (10.0.2.6) | enp0s3 | NatNetwork |  |
 | __Firewall Machine__ |
-| 1 | INTERNET (10.0.2.4) | enp0s3 | NatNetwork |  |
+| 1 | INTERNET (10.0.2.10) | enp0s3 | NatNetwork |  |
 | 2 | 192.168.0.1 | enp0s3 | Internal Network | sw-0
 | 3 | 192.168.1.1 | enp0s8 | Internal Network | sw-1
 | 4 | 192.168.2.1 | enp0s9 | Internal Network | sw-2
@@ -74,7 +74,7 @@ All machines will be running on Linux and configured according to the following 
 For each machine, run the following commands:
 
     cd ecoges/scripts
-    sudo chmod +x <script>.sh
+    sudo chmod 777 <script>.sh
 
 
 > **TIP: If the script does not run as expected, convert the file to unix format using the `dos2unix` tool and run the script again**
@@ -108,9 +108,9 @@ Before deploying all machines, you need to generate the certificates that will b
 
 For the TLS, both webserver, backoffice and database ceritificates need to be issued to their IP address.
 
-Change the field `IP.1` in `ecoges/scripts/webserver-domains.ext` to the corresponding IP address (e.g. Firewall public IP `10.0.2.4`) and `IP.2` to its own address `192.168.0.2`
+Change the field `IP.1` in `ecoges/scripts/webserver-domains.ext` to the corresponding IP address (e.g. Firewall public IP `10.0.2.10`) and `IP.2` to its own address `192.168.0.2`
  
-    IP.1 = 10.0.2.4
+    IP.1 = 10.0.2.10
     IP.2 = 192.168.0.2
 
 Change the field `IP.1` in `ecoges/scripts/backoffice-domains.ext` to the corresponding IP address (e.g. `192.168.2.2`)
@@ -184,7 +184,7 @@ To simplify the task, we created a script that runs each module automatically.
 Run each module for each machine by providing the following possible values to `<module>` field: **webserver**, **backoffice**, **rbac**, **client** or **admin**. If desired, modules can be run on localhost by setting the development environment `-dev` before specifying the module.
 
     cd ecoges
-    sudo chmod +x run.sh
+    sudo chmod 777 run.sh
     ./run.sh <module>
 
 ## Alternative 2

@@ -27,7 +27,7 @@ openssl req -new -key database.key -out database.csr -subj "/C=PT/ST=Lisbon/L=Li
 openssl x509 -req -days 365 -in database.csr -CA ca.crt -CAkey ca.key -extfile database-domains.ext -set_serial 01 -out database.crt
 
 rm database.csr
-mv database.key database.crt database.pem ../databaseTLS/
+mv database.key database.crt ../databaseTLS/
 cp ca.crt ../databaseTLS/
 
 
