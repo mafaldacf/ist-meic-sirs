@@ -1,6 +1,12 @@
 DROP DATABASE IF EXISTS clientdb;
 CREATE DATABASE clientdb;
 
+CREATE USER 'ecoges'@'192.168.0.2' IDENTIFIED BY 'admin'; --webserver host
+GRANT ALL PRIVILEGES ON clientdb.* TO 'ecoges'@'192.168.0.2';
+
+CREATE USER 'ecoges'@'192.168.2.2' IDENTIFIED BY 'admin'; -- backoffice host
+GRANT ALL PRIVILEGES ON clientdb.* TO 'ecoges'@'192.168.2.2';
+
 -- webserver
 
 DROP TABLE IF EXISTS clientdb.client;
