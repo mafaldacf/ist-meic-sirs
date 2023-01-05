@@ -55,7 +55,7 @@ All machines will be running on Linux and configured according to the following 
 | __Client Machine__ |||||||||
 | 1 | INTERNET (10.0.2.6) | enp0s3 | NatNetwork |  |
 | __Firewall Machine__ |
-| 1 | INTERNET (10.0.2.4) | enp0s3 | NatNetwork |  |
+| 1 | INTERNET (10.0.2.10) | enp0s3 | NatNetwork |  |
 | 2 | 192.168.0.1 | enp0s3 | Internal Network | sw-0
 | 3 | 192.168.1.1 | enp0s8 | Internal Network | sw-1
 | 4 | 192.168.2.1 | enp0s9 | Internal Network | sw-2
@@ -74,7 +74,7 @@ All machines will be running on Linux and configured according to the following 
 For each machine, run the following commands:
 
     cd ecoges/scripts
-    chmod 777 <script>.sh
+    sudo chmod 777 <script>.sh
 
 
 > **TIP: If the script does not run as expected, convert the file to unix format using the `dos2unix` tool and run the script again**
@@ -100,7 +100,7 @@ Database machine:
 
 Admin machine:
 
-    sudo ./terminal.sh
+    sudo ./admin-terminal.sh
 
 # Generate Certificates
 
@@ -108,9 +108,9 @@ Before deploying all machines, you need to generate the certificates that will b
 
 For the TLS, both webserver, backoffice and database ceritificates need to be issued to their IP address.
 
-Change the field `IP.1` in `ecoges/scripts/webserver-domains.ext` to the corresponding IP address (e.g. Firewall public IP `10.0.2.4`) and `IP.2` to its own address `192.168.0.2`
+Change the field `IP.1` in `ecoges/scripts/webserver-domains.ext` to the corresponding IP address (e.g. Firewall public IP `10.0.2.10`) and `IP.2` to its own address `192.168.0.2`
  
-    IP.1 = 10.0.2.4
+    IP.1 = 10.0.2.10
     IP.2 = 192.168.0.2
 
 Change the field `IP.1` in `ecoges/scripts/backoffice-domains.ext` to the corresponding IP address (e.g. `192.168.2.2`)
@@ -134,39 +134,16 @@ To generate the certificates, simply run the script:
 
     cd ecoges/scripts
 
-Add `clientdb` schema:
+Add `clientdb` schema and configure privileges (if needed, change the host IPs inside the file)
 
     sudo mysql
         source createdb.sql
-
-Create an user for webserver and backoffice with hosts `192.168.0.2` and `192.168.2.2`, respectively (alternatively, can use `localhost` during development) and add privileges:
-
-        CREATE USER 'ecoges'@'192.168.0.2' IDENTIFIED BY 'admin';
-        GRANT ALL PRIVILEGES ON clientdb.* TO 'ecoges'@'192.168.0.2';
-
-        CREATE USER 'ecoges'@'192.168.2.2' IDENTIFIED BY 'admin';
-        GRANT ALL PRIVILEGES ON clientdb.* TO 'ecoges'@'192.168.2.2';
 
 Change `bind-address` field to desired `<databaseHost>` of database (e.g. `192.168.1.2`):
 
     exit
     sudo vim /etc/mysql/mysql.conf.d/mysqld.cnf
         bind-address = 192.168.1.2
-
-
-To configure TLS, copy keys and certificates:
-
-    cd SIRS/ecoges
-    sudo mkdir /etc/mysql/databaseTLS
-    sudo cp databaseTLS/ca.crt /etc/mysql/databaseTLS/ca.crt
-    sudo cp databaseTLS/database.crt /etc/mysql/databaseTLS/database.crt
-    sudo cp databaseTLS/database.key /etc/mysql/databaseTLS/database.key
-
-> **TIP: make sure these keys and certificates have root permissions, otherwise, MySQL won't be able to use SSL!**
->
->    \> **`chmod 777 /etc/mysql/databaseTLS/ca.crt`**
->    \> **`chmod 777 /etc/mysql/databaseTLS/database.crt`**
->    \> **`chmod 777 /etc/mysql/databaseTLS/database.key`**
 
 Append the following content to `/etc/mysql/my.cnf` file:
 

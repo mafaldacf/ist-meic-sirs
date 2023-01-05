@@ -4,5 +4,5 @@ authorityKeyIdentifier=keyid,issuer
     subjectAltName = @alt_names
     [alt_names]
     DNS.1 = localhost
-    IP.1 = 10.0.2.4
+    IP.1 = 10.0.2.10
     IP.2 = 192.168.0.2

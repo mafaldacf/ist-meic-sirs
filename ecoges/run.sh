@@ -7,7 +7,7 @@
 databaseHost="192.168.1.2"
 databasePort="3306"
 
-publicWebserverHost="10.0.2.4" # firewall's public IP
+publicWebserverHost="10.0.2.10" # firewall's public IP
 webserverHost="192.168.0.2"
 webserverPort="8000"
 

@@ -634,6 +634,10 @@ public class Webserver {
 
         byte[] iv = Security.generateRandom();
 
+        // make sure there is no pending temporary key to discard due to the failure
+        // of a department that did not send an acknowledgment message
+        discardTemporaryKeyIfExists(email);
+
         st = dbConnection.prepareStatement(CREATE_APPLIANCE);
         st.setInt(1, getClientId(email));
         st.setString(2, applianceName);
@@ -679,6 +683,10 @@ public class Webserver {
         float energyProduced = (float)(Math.random()* MAX_ENERGY_PRODUCTION);
 
         byte[] iv = Security.generateRandom();
+        
+        // make sure there is no pending temporary key to discard due to the failure
+        // of a department that did not send an acknowledgment message
+        discardTemporaryKeyIfExists(email);
 
         // add solar panel
         st = dbConnection.prepareStatement(CREATE_SOLAR_PANEL);
