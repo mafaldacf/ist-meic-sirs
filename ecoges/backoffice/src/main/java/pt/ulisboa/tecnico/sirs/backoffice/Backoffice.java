@@ -205,7 +205,7 @@ public class Backoffice {
     */
 
     public void register(String username, String password, String role)
-            throws SQLException, AdminAlreadyExistsException {
+            throws SQLException, AdminAlreadyExistsException, NoSuchAlgorithmException {
 
         PreparedStatement st;
         ResultSet rs;
@@ -222,12 +222,16 @@ public class Backoffice {
 
         st.close();
 
+        byte[] salt = Security.generateRandom();
+        String hashedPassword = Security.hashWithSalt(password, salt);
+
         // register username
         st = dbConnection.prepareStatement(CREATE_ADMIN);
 
         st.setString(1, username);
-        st.setString(2, password);
-        st.setString(3, role);
+        st.setString(2, hashedPassword);
+        st.setBytes(3, salt);
+        st.setString(4, role);
 
         st.executeUpdate();
 
@@ -243,17 +247,21 @@ public class Backoffice {
         ResultSet rs;
         String role;
 
-        st = dbConnection.prepareStatement(READ_ADMIN_PASSWORD_ROLE);
+        st = dbConnection.prepareStatement(READ_ADMIN_PASSWORD_SALT_ROLE);
         st.setString(1, username);
 
         rs = st.executeQuery();
 
         if (rs.next()) {
-            String dbPassword = rs.getString(1);
-            if (!password.equals(dbPassword)) {
+            String dbHashedPassword = rs.getString(1);
+            byte[] salt = rs.getBytes(2);
+            role = rs.getString(3);
+
+            String hashedPassword = Security.hashWithSalt(password, salt);
+            if (!hashedPassword.equals(dbHashedPassword)) {
+                st.close();
                 throw new WrongPasswordException();
             }
-            role = rs.getString(2);
         }
         else {
             throw new AdminDoesNotExistException(username);

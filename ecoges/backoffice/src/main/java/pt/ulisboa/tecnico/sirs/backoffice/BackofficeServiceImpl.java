@@ -32,7 +32,7 @@ public class BackofficeServiceImpl extends BackofficeServiceGrpc.BackofficeServi
 
 			responseObserver.onNext(builder.build());
 			responseObserver.onCompleted();
-		} catch (SQLException e){
+		} catch (SQLException | NoSuchAlgorithmException e){
 			responseObserver.onError(Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
 		} catch (AdminAlreadyExistsException e){
 			responseObserver.onError(Status.ALREADY_EXISTS.withDescription(e.getMessage()).asRuntimeException());

@@ -8,13 +8,14 @@ public class DatabaseQueries {
         "username VARCHAR(150) NOT NULL," +
         "password VARCHAR(150) NOT NULL," +
         "token VARCHAR(64) DEFAULT ''," +
+        "salt BLOB," + // password hash
         "role VARCHAR(25) NOT NULL," + // ACCOUNT_MANAGER, ENERGY_MANAGER
         "UNIQUE (username)," +
         "PRIMARY KEY (id))";
 
-    public static final String CREATE_ADMIN = "INSERT INTO admin(username, password, role) VALUES(?, ?, ?)";
+    public static final String CREATE_ADMIN = "INSERT INTO admin(username, password, salt, role) VALUES(?, ?, ?, ?)";
 
-    public static final String READ_ADMIN_PASSWORD_ROLE = "SELECT password, role FROM admin WHERE username = ?";
+    public static final String READ_ADMIN_PASSWORD_SALT_ROLE = "SELECT password, salt, role FROM admin WHERE username = ?";
     public static final String READ_ADMIN_ROLE = "SELECT role FROM admin WHERE username = ?";
 
     public static final String READ_CLIENT_ID = "SELECT id FROM client WHERE email = ?";

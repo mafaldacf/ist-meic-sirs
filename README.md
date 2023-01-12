@@ -4,6 +4,8 @@ Master's Degree in Computer Science and Engineering
 
 Network and Computer Security 2022/2023
 
+Project Grade: 20.00 / 20.00
+
 # EcoGes
 
 This project aims to develop a new system for the electricity provider, Ecoges, which allows clients to monitor the energy cost of household appliances and the energy production of solar panels. The system is also used to calculate the monthly invoices for consumed energy and taxes and manage the energy plan (flat or bi-hourly rate).

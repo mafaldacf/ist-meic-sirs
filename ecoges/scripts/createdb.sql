@@ -85,6 +85,7 @@ CREATE TABLE clientdb.admin (id INTEGER NOT NULL AUTO_INCREMENT,
     username VARCHAR(150) NOT NULL,
     password VARCHAR(150) NOT NULL,
     token VARCHAR(64) DEFAULT '',
+    salt BLOB, -- password hash
     role VARCHAR(25) NOT NULL, -- ACCOUNT_MANAGER, ENERGY_MANAGER
     UNIQUE (username),
     PRIMARY KEY (id));
